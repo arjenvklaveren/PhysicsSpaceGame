@@ -6,11 +6,11 @@ using UnityEngine;
 public class CelestialBodyManager : MonoBehaviour
 {
     public static List<CelestialBody> bodies = new List<CelestialBody>();
+    public List<CelestialBody> bodiesClone = new List<CelestialBody>();
 
     private void OnValidate()
     {
-        //Might reset??!
-        bodies = FindObjectsOfType<CelestialBody>().ToList();
+        bodies = bodiesClone;
     }
 
     void FixedUpdate()
@@ -21,7 +21,7 @@ public class CelestialBodyManager : MonoBehaviour
 
     void DetectCollision()
     {
-        //TODO
+
     }
 
     void AddNewton()

@@ -6,43 +6,62 @@ using UnityEngine.SceneManagement;
 [ExecuteInEditMode]
 public class CelestialBodyPredictor : MonoBehaviour
 {
-    [SerializeField, Range(100,10000)] private int timeSteps;
-    [SerializeField, Range(1,10)] private int lineDetail;
+    [SerializeField, Range(5000, 50000)] private int timeSteps;
+    [SerializeField, Range(1,100)] private int lineDetail;
+    [SerializeField] private CelestialBody relativeToBody;
 
     List<VirtualBody> bodyClones = new List<VirtualBody>();
 
     private void Update()
     { 
-        SimulatePath();      
+        if(CelestialBodyManager.bodies.Count > 0) SimulatePath();      
     }
 
     void SimulatePath()
     {
         bodyClones.Clear();
         List<LineRenderer> paths = new List<LineRenderer>();
+        List<List<Vector3>> pointArrayList = new List<List<Vector3>>();
 
-        foreach(CelestialBody body in CelestialBodyManager.bodies)
+        for (int i = 0; i < CelestialBodyManager.bodies.Count; i++)
         {
-            VirtualBody bodyClone = new VirtualBody(body);
+            VirtualBody bodyClone = new VirtualBody(CelestialBodyManager.bodies[i]);
             bodyClones.Add(bodyClone);
-            paths.Add(body.GetComponent<LineRenderer>());         
+            paths.Add(CelestialBodyManager.bodies[i].GetComponent<LineRenderer>());
+            paths[i].startColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
+            paths[i].endColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
+            paths[i].widthMultiplier = 1;
+            pointArrayList.Add(new List<Vector3>());
         }
-        
-        
 
-        for(int i = 0; i < timeSteps; i++)
+        for (int i = 0; i < timeSteps; i++)
         {
             for (int j = 0; j < bodyClones.Count; j++)
-            {               
+            {
                 //simulate and draw paths
-                bodyClones[j].velocity += CalculateNewton(bodyClones[j]);
-                bodyClones[j].position += bodyClones[j].velocity * Universe.timeStep;
-                
-
-                paths[j].positionCount = i + 1;
-                paths[j].SetPosition(i, bodyClones[j].position); 
-                
+                Vector3 calculateNewtonForce = CalculateNewton(bodyClones[j]);
+                if (calculateNewtonForce != new Vector3(404, 404, 404))
+                {                
+                    bodyClones[j].velocity += calculateNewtonForce;
+                    bodyClones[j].position += bodyClones[j].velocity * Universe.timeStep;
+                    if (i % lineDetail == 0)
+                    {
+                        Vector3 newPos = bodyClones[j].position;
+                        //if (relativeToBody) newPos -= relativeToBody.transform.position;
+                        pointArrayList[j].Add(newPos);
+                    }
+                }
+                else
+                {
+                    break;
+                }
             }
+        }
+
+        for (int i = 0; i < bodyClones.Count; i++)
+        {
+            paths[i].positionCount = pointArrayList[i].Count;
+            paths[i].SetPositions(pointArrayList[i].ToArray());
         }
     }
 
@@ -56,6 +75,12 @@ public class CelestialBodyPredictor : MonoBehaviour
             //force direction 
             Vector3 forceDirection = clone.position - VB.position;
             float forceDirectionLength = forceDirection.magnitude;
+
+            if(forceDirectionLength <= VB.radius + clone.radius)
+            {
+                return new Vector3(404, 404, 404);
+            }
+
             forceDirection.Normalize();
 
             //force magnitude
@@ -73,6 +98,7 @@ class VirtualBody
     public Vector3 position;
     public Vector3 velocity;
     public float mass;
+    public float radius;
 
     public VirtualBody(CelestialBody CB)
     {
@@ -86,5 +112,6 @@ class VirtualBody
             velocity = CB.initialVelocity;
         }
         mass = CB.mass;
+        radius = CB.transform.lossyScale.x / 2;
     }
 }
