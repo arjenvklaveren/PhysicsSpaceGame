@@ -1,0 +1,122 @@
+#pragma kernel CalcRings
+#pragma kernel ClearFrame
+
+//NOTE: THIS ONLY WORKS FOR 1 PLANET (YET)    
+
+static const float PI = 3.14159265f;
+static const float gravConstant = 0.01f;
+static const float particleMass = 1;
+
+RWTexture2D<float4> particlesTexture;
+
+float4x4 projectionMatrix;
+float2 camSize;
+
+struct Particle
+{
+    float3 position;
+    float3 velocity;    
+    float3 color;
+};
+
+struct Ring
+{
+    float4 color;
+    int density;
+    int width;
+};
+
+RWStructuredBuffer<Particle> particles;
+RWStructuredBuffer<Ring> rings;
+
+float particleCount;
+int ringCount;
+float startRingDistance;
+
+float timeStep;
+float time;
+
+float planetMass;
+float planetRadius;
+float3 planetPos;
+
+bool firstLoop;
+
+float3 RandomVector()
+{
+    float random1 = frac(sin(dot(time, float2(12.9898, 78.233))) * 43758.5453);
+    float random2 = frac(sin(dot(time, float2(94.9013, 72.623))) * 63456.1789);
+    float random3 = frac(sin(dot(time, float2(78.233, 45.5019))) * 87651.3342);
+    return float3(random1, random2, random3);
+}
+
+float RandomFloat()
+{
+    return frac(sin(dot(time * 2, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+float2 World3DToScreen2D(float3 worldPos3D)
+{
+    float4 posClip = mul(projectionMatrix, float4(worldPos3D, 1)).xyzw;
+    posClip /= posClip.w;
+    float2 halfCam = camSize * 0.5f;
+    return float2((posClip.x * halfCam.x) + halfCam.x, (posClip.y * halfCam.y) + halfCam.y);
+}
+
+[numthreads(256, 1, 1)]
+void CalcRings(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < 0 || id.x >= particleCount) return;
+    
+    int currentID = id.x;
+    Particle p = particles[currentID];
+      
+    if (firstLoop)
+    {                      
+        float ringWidth = rings[0].width;        
+        float ringIndex = floor(currentID / (particleCount / (ringWidth * ringCount)));
+        float totalRingOffset = (ringIndex * 0.2f);
+        
+        //p.color = float3(ringIndex / 255, ringIndex / 255, ringIndex / 255);
+        p.color = rings[0].color;
+        //p.color = float3(1,1,1);
+        
+        float distance = planetRadius + startRingDistance + totalRingOffset;
+              
+        float heightOffset = planetPos.y;
+             
+        float angle = ((360 / (particleCount / (ringCount * ringWidth))) * (currentID + 1) * PI / 180);
+        p.position = float3(cos(angle) * distance + planetPos.x, heightOffset, sin(angle) * distance + planetPos.z);
+                              
+        //calculate initial velocity for perfect orbit based on distance
+        float3 forceDirection = planetPos - p.position;
+        float forceDirectionLength = length(forceDirection);
+        float3 unitPerpVector = normalize(float3(forceDirection.z, forceDirection.y, -forceDirection.x));
+        float centForce = (gravConstant * planetMass) / sqrt(forceDirectionLength);
+                 
+        p.velocity = (unitPerpVector * centForce);
+    }
+     
+    //calculate newton
+    float3 forceDirection = planetPos - p.position;
+    float forceDirectionLength = length(forceDirection);
+    float gravityForce = gravConstant * (planetMass * particleMass) / (forceDirectionLength * forceDirectionLength);
+    float3 forceVector = normalize(forceDirection) * gravityForce;
+   
+    //set velocity and position using newton
+    p.velocity += forceVector;
+    p.position += p.velocity * timeStep;
+          
+    float2 particleScreenPos = World3DToScreen2D(p.position);
+      
+    particlesTexture[World3DToScreen2D(p.position)] = float4(p.color, 1);
+    
+    particles[currentID] = p;
+}
+
+[numthreads(8, 8, 1)]
+void ClearFrame(uint3 id : SV_DispatchThreadID)
+{
+    //clear texture
+    particlesTexture[id.xy] = float4(0, 0, 0, 0);
+}

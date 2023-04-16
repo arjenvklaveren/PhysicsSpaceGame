@@ -1,0 +1,35 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+int objectPosX;
+int objectPosY;
+int objectPosZ;
+float4x4 projectionMatrix;
+float2 camSize;
+
+int radius;
+
+float2 World3DToScreen2D(float3 worldPos3D)
+{
+    float4 posClip = mul(projectionMatrix, float4(worldPos3D, 1)).xyzw;
+    posClip /= posClip.w;
+    float2 halfCam = camSize * 0.5f;
+    return float2((posClip.x * halfCam.x) + halfCam.x, (posClip.y * halfCam.y) + halfCam.y);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 pos = World3DToScreen2D(float3(objectPosX, objectPosY, objectPosZ));
+    radius = 10;
+      
+    if (id.x >= pos.x - radius && id.x <= pos.x + radius && id.y >= pos.y - radius && id.y <= pos.y + radius)
+    {
+        Result[id.xy] = float4(0.0, 0.0, 0.0, 1.0);
+    }
+    else
+    {
+        Result[id.xy] = float4(0.0, 0.0, 0.0, 0.0);
+    }
+}
+

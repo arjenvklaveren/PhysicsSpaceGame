@@ -49,7 +49,7 @@ public class CelestialBodyManager : MonoBehaviour
             float force = Universe.G * (globe.mass * CB.mass) / (forceDirectionLength * forceDirectionLength);
 
             //force vector
-            forceVector += (forceDirection * force) / CB.mass;
+            forceVector += (forceDirection * force) / CB.mass;           
         }
         return forceVector;
     }

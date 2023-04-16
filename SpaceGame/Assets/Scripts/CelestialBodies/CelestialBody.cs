@@ -20,7 +20,7 @@ public class CelestialBody : MonoBehaviour
     }
 
     public void AddForce(Vector3 force)
-    {
+    {        
         velocity += force;
     }
 

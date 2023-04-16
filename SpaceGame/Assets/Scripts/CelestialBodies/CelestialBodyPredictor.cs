@@ -6,8 +6,8 @@ using UnityEngine.SceneManagement;
 [ExecuteInEditMode]
 public class CelestialBodyPredictor : MonoBehaviour
 {
-    [SerializeField, Range(5000, 50000)] private int timeSteps;
-    [SerializeField, Range(1,100)] private int lineDetail;
+    [SerializeField, Range(5000, 100000)] private int timeSteps;
+    [SerializeField, Range(1,250)] private int lineDetail;
     [SerializeField] private CelestialBody relativeToBody;
 
     List<VirtualBody> bodyClones = new List<VirtualBody>();
@@ -23,6 +23,8 @@ public class CelestialBodyPredictor : MonoBehaviour
         List<LineRenderer> paths = new List<LineRenderer>();
         List<List<Vector3>> pointArrayList = new List<List<Vector3>>();
 
+        int relativeIndex = 0;
+      
         for (int i = 0; i < CelestialBodyManager.bodies.Count; i++)
         {
             VirtualBody bodyClone = new VirtualBody(CelestialBodyManager.bodies[i]);
@@ -32,6 +34,8 @@ public class CelestialBodyPredictor : MonoBehaviour
             paths[i].endColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
             paths[i].widthMultiplier = 1;
             pointArrayList.Add(new List<Vector3>());
+
+            if (relativeToBody != null && bodyClone.position == relativeToBody.transform.position) relativeIndex = i; 
         }
 
         for (int i = 0; i < timeSteps; i++)
@@ -47,12 +51,14 @@ public class CelestialBodyPredictor : MonoBehaviour
                     if (i % lineDetail == 0)
                     {
                         Vector3 newPos = bodyClones[j].position;
-                        //if (relativeToBody) newPos -= relativeToBody.transform.position;
+                        if (relativeToBody) newPos -= (bodyClones[relativeIndex].position - relativeToBody.transform.position);
                         pointArrayList[j].Add(newPos);
                     }
                 }
                 else
                 {
+                    paths[j].startColor = Color.red;
+                    paths[j].endColor = Color.red;
                     break;
                 }
             }
