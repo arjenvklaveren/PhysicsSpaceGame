@@ -8,6 +8,7 @@ static const float gravConstant = 0.01f;
 static const float particleMass = 1;
 
 RWTexture2D<float4> particlesTexture;
+RWTexture2D<float4> camDepthTexture;
 
 float4x4 projectionMatrix;
 float2 camSize;
@@ -15,7 +16,7 @@ float2 camSize;
 struct Particle
 {
     float3 position;
-    float3 velocity;    
+    float3 velocity;
     float3 color;
 };
 
@@ -42,6 +43,8 @@ float3 planetPos;
 
 bool firstLoop;
 
+float ringWidthOffset;
+
 float3 RandomVector()
 {
     float random1 = frac(sin(dot(time, float2(12.9898, 78.233))) * 43758.5453);
@@ -55,6 +58,52 @@ float RandomFloat()
     return frac(sin(dot(time * 2, float2(12.9898, 78.233))) * 43758.5453);
 }
 
+int GetRingIndex(int particleID)
+{
+    int index;
+    int particlesCheck;
+    for (int i = 0; i < ringCount; i++)
+    {
+        particlesCheck += rings[i].density;
+        if (particleID <= particlesCheck)
+        {
+            index = i;
+            break;
+        }
+    }
+    return index;
+}
+
+int RingRelativeID(int ringID, int particleID)
+{
+    int relativeID = particleID;
+    
+    for (int i = 0; i < ringID; i++)
+    {
+        relativeID -= rings[i].density;
+    }
+    return relativeID;
+}
+
+float CalcRingDistance(int ringID, int particleID)
+{
+    float distance = 0;
+    distance += planetRadius + startRingDistance;
+    
+    float ringWidthRow = floor(RingRelativeID(ringID, particleID) / (rings[ringID].density / (rings[ringID].width)));;
+    float widthOffset = ringWidthRow * ringWidthOffset;
+    distance += widthOffset;
+    
+    float offset = 0;
+    for (int i = 0; i < ringID; i++)
+    {
+        offset += (rings[i].width + 5) * ringWidthOffset;
+    }
+    distance += offset;
+    
+    return distance;
+}
+
 float2 World3DToScreen2D(float3 worldPos3D)
 {
     float4 posClip = mul(projectionMatrix, float4(worldPos3D, 1)).xyzw;
@@ -66,28 +115,26 @@ float2 World3DToScreen2D(float3 worldPos3D)
 [numthreads(256, 1, 1)]
 void CalcRings(uint3 id : SV_DispatchThreadID)
 {
-    if (id.x < 0 || id.x >= particleCount) return;
+    if (id.x < 0 || id.x >= particleCount)
+        return;
     
     int currentID = id.x;
     Particle p = particles[currentID];
       
     if (firstLoop)
-    {                      
-        float ringWidth = rings[0].width;        
-        float ringIndex = floor(currentID / (particleCount / (ringWidth * ringCount)));
-        float totalRingOffset = (ringIndex * 0.2f);
-        
-        //p.color = float3(ringIndex / 255, ringIndex / 255, ringIndex / 255);
-        p.color = rings[0].color;
-        //p.color = float3(1,1,1);
-        
-        float distance = planetRadius + startRingDistance + totalRingOffset;
+    {
+        int ringIndex = GetRingIndex(currentID);
               
+        ringWidthOffset = 0.1f;
+        float distance = CalcRingDistance(ringIndex, currentID);
+        
         float heightOffset = planetPos.y;
-             
-        float angle = ((360 / (particleCount / (ringCount * ringWidth))) * (currentID + 1) * PI / 180);
+        
+        float angle = 360.0 / (rings[ringIndex].density / rings[ringIndex].width) * RingRelativeID(ringIndex, currentID);
+        angle = angle * (PI / 180);
+        
         p.position = float3(cos(angle) * distance + planetPos.x, heightOffset, sin(angle) * distance + planetPos.z);
-                              
+                                      
         //calculate initial velocity for perfect orbit based on distance
         float3 forceDirection = planetPos - p.position;
         float forceDirectionLength = length(forceDirection);
@@ -95,6 +142,7 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
         float centForce = (gravConstant * planetMass) / sqrt(forceDirectionLength);
                  
         p.velocity = (unitPerpVector * centForce);
+        p.color = rings[ringIndex].color;
     }
      
     //calculate newton
@@ -109,9 +157,17 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
           
     float2 particleScreenPos = World3DToScreen2D(p.position);
       
-    particlesTexture[World3DToScreen2D(p.position)] = float4(p.color, 1);
-    
     particles[currentID] = p;
+    
+    //TODO dont render if behind object
+    
+    //if (camDepthTexture[particleScreenPos].r < 10)
+    //{
+    //    return;
+    //}
+           
+    //render
+    particlesTexture[particleScreenPos] = float4(p.color, 1);
 }
 
 [numthreads(8, 8, 1)]

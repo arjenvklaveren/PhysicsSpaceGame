@@ -91,6 +91,7 @@ public class PlanetRings : MonoBehaviour
 
         shader.SetTexture(kernelID, "particlesTexture", particlesTexture);
         shader.SetTexture(1, "particlesTexture", particlesTexture);
+        //shader.SetTexture(0, "camDepthTexture", Shader.GetGlobalTexture("_CameraDepthTexture"));
         OnRenderEvent.OnRenderImageEvent += OnRenderCam;
     }
 
