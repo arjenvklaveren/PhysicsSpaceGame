@@ -15,6 +15,7 @@ public class PlanetRings : MonoBehaviour
 
     private ComputeBuffer particlesBuffer;
     private ComputeBuffer ringsBuffer;
+    private ComputeBuffer planetBuffer;
 
     float timeStep = 0.02f;
 
@@ -33,6 +34,10 @@ public class PlanetRings : MonoBehaviour
 
     bool firstLoop = true;
 
+    public Texture testTexture;
+
+    Texture depthTex;
+
     struct Particle
     {
         public Vector3 position;
@@ -47,11 +52,19 @@ public class PlanetRings : MonoBehaviour
         public int width;
     }
 
+    public struct Planet
+    {
+        public Vector4 color;
+        public int density;
+        public int width;
+    }
+
     void Start()
     {
         planetMass = planet.transform.localScale.x * 50;
         kernelID = shader.FindKernel("CalcRings");
 
+        //set rings
         ringsS = new Ring[rings.Length];
         for(int i = 0; i < rings.Length; i++)
         {
@@ -61,13 +74,16 @@ public class PlanetRings : MonoBehaviour
             ringsS[i].density = rings[i].density;
             ringsS[i].width = rings[i].width;
         }
+        //set planets
+
 
         shader.SetBool("firstLoop", true);
         shader.SetFloat("particleCount", particleCount);
         shader.SetFloat("timeStep", timeStep);
-        shader.SetFloat("planetMass", planetMass);
-        shader.SetFloat("planetRadius", planet.transform.lossyScale.x / 2);
+        shader.SetFloat("parentPlanetRadius", planet.transform.lossyScale.x / 2);
         shader.SetInt("ringCount", rings.Length);
+        shader.SetFloat("camFarClipPlane", cam.farClipPlane);
+        shader.SetFloat("camNearClipPlane", cam.nearClipPlane);
         shader.SetFloat("startRingDistance", ringStartDistance);
 
         particles = new Particle[particleCount];
@@ -91,29 +107,38 @@ public class PlanetRings : MonoBehaviour
 
         shader.SetTexture(kernelID, "particlesTexture", particlesTexture);
         shader.SetTexture(1, "particlesTexture", particlesTexture);
-        //shader.SetTexture(0, "camDepthTexture", Shader.GetGlobalTexture("_CameraDepthTexture"));
+        cam.depthTextureMode = DepthTextureMode.Depth;
         OnRenderEvent.OnRenderImageEvent += OnRenderCam;
     }
 
     void FixedUpdate()
-    {
-        SimulateRing();
+    {     
+        if (depthTex != null)
+        {
+            SimulateRing();
+        }
     }
 
     void OnRenderCam(RenderTexture src, RenderTexture dest)
     {      
         Graphics.Blit(particlesTexture, dest, particleMaterial);
+        depthTex = Shader.GetGlobalTexture("_CameraDepthTexture");
     }
 
     void SimulateRing()
-    {
-        shader.SetVector("planetPos", planet.transform.position);       
+    {      
         shader.SetVector("camSize", new Vector2(cam.pixelWidth, cam.pixelHeight));
         shader.SetFloat("time", Time.time + Random.Range(0.0f, 100.0f));
         shader.SetMatrix("projectionMatrix", cam.projectionMatrix * cam.worldToCameraMatrix);           
+        shader.SetTexture(0, "camDepthTexture", depthTex);          
+
         shader.Dispatch(1, cam.pixelWidth / 8, cam.pixelHeight / 8, 1);
         shader.Dispatch(kernelID, threadGroups, 1, 1);
 
+        //Vector3 testPos = planet.transform.position;
+        //testPos = cam.worldToCameraMatrix * testPos;
+        //Vector4 testPos4 = cam.projectionMatrix * new Vector4(testPos.x, testPos.y, testPos.z, 1);
+        //Debug.Log(testPos4.z);
 
         if (firstLoop)
         {

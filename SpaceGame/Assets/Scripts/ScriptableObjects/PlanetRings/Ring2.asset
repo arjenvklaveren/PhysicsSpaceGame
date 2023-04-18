@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Ring2
   m_EditorClassIdentifier: 
   ringColor: {r: 0, g: 0.21236968, b: 1, a: 0}
-  density: 400000
-  width: 40
+  density: 600000
+  width: 60
