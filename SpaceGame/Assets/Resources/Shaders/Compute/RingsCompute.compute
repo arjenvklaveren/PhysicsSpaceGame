@@ -107,7 +107,7 @@ float CalcRingDistance(int ringID, int particleID)
     float offset = 0;
     for (int i = 0; i < ringID; i++)
     {
-        offset += (rings[i].width + 5) * ringWidthOffset;
+        offset += (rings[i].width + 10) * ringWidthOffset;
     }
     distance += offset;
     
@@ -166,6 +166,8 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
     //calculate newton
        
     float3 forceVector;
+    bool collided = false;
+        
     for (int i = 0; i < planetCount; i++)
     {
         float3 forceDirection = planets[i].position - p.position;
@@ -173,18 +175,23 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
         float gravityForce = gravConstant * (planets[i].mass * particleMass) / (forceDirectionLength * forceDirectionLength);
         forceVector += normalize(forceDirection) * gravityForce;
             
-        //disable particle if collided with planet
+        //"disable" particle if collided with planet
         if (forceDirectionLength < planets[i].radius)
         {
-            //p.color = float4(0, 0, 0, 0);
-            //p.position = float3(100000, 100000, 100000);
+            //p.velocity = float3(0, 0, 0);
+            //forceVector = float3(0, 0, 0);
+            //p.position = planets[i].position + forceDirection;
+            collided = true;
         }
     }
           
     //set velocity and position using newton
-    p.velocity += forceVector;
-    p.position += p.velocity * timeStep;
-          
+    if(!collided)
+    {
+        p.velocity += forceVector;
+        p.position += p.velocity * timeStep;
+    }
+             
     float2 particleScreenPos = World3DToScreen2D(p.position);
       
     particles[currentID] = p;
@@ -206,7 +213,7 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
     }
     
     //render
-    particlesTexture[particleScreenPos] = p.color;
+    particlesTexture[particleScreenPos] = p.color;        
 }
 
 [numthreads(8, 8, 1)]

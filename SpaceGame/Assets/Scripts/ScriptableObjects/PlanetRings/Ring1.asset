@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1746f0261604f54b940a0bc155a251f, type: 3}
   m_Name: Ring1
   m_EditorClassIdentifier: 
-  ringColor: {r: 1, g: 0, b: 0, a: 0}
-  density: 400000
-  width: 40
+  ringColor: {r: 0.21568629, g: 0.21176472, b: 0.15686275, a: 0}
+  density: 800000
+  width: 80

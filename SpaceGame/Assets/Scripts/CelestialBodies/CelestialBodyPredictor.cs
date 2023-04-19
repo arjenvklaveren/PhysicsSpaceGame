@@ -8,6 +8,7 @@ public class CelestialBodyPredictor : MonoBehaviour
 {
     [SerializeField, Range(5000, 100000)] private int timeSteps;
     [SerializeField, Range(1,250)] private int lineDetail;
+
     [SerializeField] private CelestialBody relativeToBody;
 
     List<VirtualBody> bodyClones = new List<VirtualBody>();
