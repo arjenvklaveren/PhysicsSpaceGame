@@ -6,7 +6,8 @@
 static const float PI = 3.14159265f;
 static const float particleMass = 1;
 
-float gravConstant = 0.01f;
+float gravConstant;
+float gravConstant2 = 0.01;
 
 RWTexture2D<float4> particlesTexture;
 Texture2D<float4> camDepthTexture;
@@ -21,12 +22,13 @@ struct Planet
 {
     float3 position;
     float mass;
+    float radius;
 };  
 struct Particle
 {
     float3 position;
     float3 velocity;
-    float3 color;
+    float4 color;
 };
 struct Ring
 {
@@ -48,7 +50,6 @@ float timeStep;
 float time;
 
 int parentPlanetID;
-float parentPlanetRadius;
     
 bool firstLoop;
 
@@ -97,7 +98,7 @@ int RingRelativeID(int ringID, int particleID)
 float CalcRingDistance(int ringID, int particleID)
 {
     float distance = 0;
-    distance += parentPlanetRadius + startRingDistance;
+    distance += planets[parentPlanetID].radius + startRingDistance;
     
     float ringWidthRow = floor(RingRelativeID(ringID, particleID) / (rings[ringID].density / (rings[ringID].width)));;
     float widthOffset = ringWidthRow * ringWidthOffset;
@@ -155,10 +156,11 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
         float3 forceDirection = planets[parentPlanetID].position - p.position;
         float forceDirectionLength = length(forceDirection);
         float3 unitPerpVector = normalize(float3(forceDirection.z, forceDirection.y, -forceDirection.x));
-        float centForce = (gravConstant * planets[parentPlanetID].mass) / sqrt(forceDirectionLength);
+        float centForce = (gravConstant * (planets[parentPlanetID].mass * particleMass)) / sqrt(forceDirectionLength);
                  
         p.velocity = (unitPerpVector * centForce);
         p.color = rings[ringIndex].color;
+        p.color.w = 1;
     }
      
     //calculate newton
@@ -172,6 +174,11 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
         forceVector += normalize(forceDirection) * gravityForce;
             
         //disable particle if collided with planet
+        if (forceDirectionLength < planets[i].radius)
+        {
+            //p.color = float4(0, 0, 0, 0);
+            //p.position = float3(100000, 100000, 100000);
+        }
     }
           
     //set velocity and position using newton
@@ -199,7 +206,7 @@ void CalcRings(uint3 id : SV_DispatchThreadID)
     }
     
     //render
-    particlesTexture[particleScreenPos] = float4(p.color, 1);
+    particlesTexture[particleScreenPos] = p.color;
 }
 
 [numthreads(8, 8, 1)]

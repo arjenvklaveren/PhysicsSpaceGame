@@ -23,8 +23,6 @@ public class BodyRings : MonoBehaviour
     private ComputeBuffer ringsBuffer;
     private ComputeBuffer planetBuffer;
 
-    float timeStep = 0.02f;
-
     private int particleCount;
     private int planetCount;
     public float ringStartDistance;
@@ -42,7 +40,7 @@ public class BodyRings : MonoBehaviour
     {
         public Vector3 position;
         public Vector3 velocity;
-        public Vector3 color;
+        public Vector4 color;
     }
     public struct Ring
     {
@@ -54,6 +52,7 @@ public class BodyRings : MonoBehaviour
     {
         public Vector3 position;
         public float mass;
+        public float radius;
     }
 
     void Start()
@@ -68,6 +67,7 @@ public class BodyRings : MonoBehaviour
 
         planetCount = CelestialBodyManager.bodies.Count;
         parentPlanetID = CelestialBodyManager.bodies.IndexOf(GetComponent<CelestialBody>());
+        planets = new Planet[planetCount];
 
         SetArrayData();
         SetStartVariables();
@@ -108,7 +108,13 @@ public class BodyRings : MonoBehaviour
             ringsS[i].color = rings[i].ringColor;
             ringsS[i].density = rings[i].density;
             ringsS[i].width = rings[i].width;
-        }      
+        }
+        for (int i = 0; i < planetCount; i++)
+        {
+            planets[i].position = CelestialBodyManager.bodies[i].transform.position;
+            planets[i].radius = CelestialBodyManager.bodies[i].transform.lossyScale.x / 2;
+            planets[i].mass = 5000;
+        }
     }
 
     void SetStartVariables()
@@ -121,7 +127,6 @@ public class BodyRings : MonoBehaviour
         ringShader.SetFloat("camFarClipPlane", cam.farClipPlane);
         ringShader.SetFloat("camNearClipPlane", cam.nearClipPlane);
         ringShader.SetFloat("startRingDistance", ringStartDistance);
-        ringShader.SetFloat("parentPlanetRadius", CelestialBodyManager.bodies[parentPlanetID].transform.lossyScale.x / 2);
         ringShader.SetInt("parentPlanetID", parentPlanetID);
         ringShader.SetInt("planetCount", planetCount);
     }
@@ -129,16 +134,15 @@ public class BodyRings : MonoBehaviour
     void SetBuffers()
     {
         particles = new Particle[particleCount];
-        particlesBuffer = new ComputeBuffer(particleCount, sizeof(float) * 9);
+        particlesBuffer = new ComputeBuffer(particleCount, sizeof(float) * 10);
         ringShader.SetBuffer(kernelID, "particles", particlesBuffer);
         particlesBuffer.SetData(particles);
 
         ringsBuffer = new ComputeBuffer(rings.Length + 1, sizeof(float) * 6);
         ringShader.SetBuffer(kernelID, "rings", ringsBuffer);
         ringsBuffer.SetData(ringsS);
-
-        planets = new Planet[planetCount];
-        planetBuffer = new ComputeBuffer(CelestialBodyManager.bodies.Count, sizeof(float) * 4);
+      
+        planetBuffer = new ComputeBuffer(CelestialBodyManager.bodies.Count, sizeof(float) * 5);
         ringShader.SetBuffer(0, "planets", planetBuffer);
     }
 
@@ -153,7 +157,6 @@ public class BodyRings : MonoBehaviour
         for(int i = 0; i < planetCount; i++)
         {
             planets[i].position = CelestialBodyManager.bodies[i].transform.position;
-            planets[i].mass = 5000;
         }
         planetBuffer.SetData(planets);
         
@@ -174,8 +177,8 @@ public class BodyRings : MonoBehaviour
 
     private void OnDestroy()
     {
-        particlesBuffer.Dispose();
-        ringsBuffer.Dispose();
-        planetBuffer.Dispose();
+        //particlesBuffer.Dispose();
+        //ringsBuffer.Dispose();
+        //planetBuffer.Dispose();
     }
 }
