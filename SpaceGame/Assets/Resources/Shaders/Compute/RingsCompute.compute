@@ -1,225 +1,378 @@
-#pragma kernel CalcRings
-#pragma kernel ClearFrame
+    #pragma kernel CalcRings
+    #pragma kernel ClearFrame
 
-#include "UnityCG.cginc"
+    #include "UnityCG.cginc"
 
-static const float PI = 3.14159265f;
-static const float particleMass = 1;
+    static const float PI = 3.14159265f;
+    static const float particleMass = 1;
 
-float gravConstant;
-float gravConstant2 = 0.01;
+    float gravConstant;
 
-RWTexture2D<float4> particlesTexture;
-Texture2D<float4> camDepthTexture;
+    RWTexture2D<float4> particlesTexture;
+    Texture2D<float4> camDepthTexture;
+    Texture2D<float4> ringStripTexture;
 
-float4x4 projectionMatrix;
-float2 camSize;
+    float4x4 projectionMatrix;
+    float2 camSize;
 
-float camNearClipPlane;
-float camFarClipPlane;
+    float camNearClipPlane;
+    float camFarClipPlane;
 
-struct Planet
-{
-    float3 position;
-    float mass;
-    float radius;
-};  
-struct Particle
-{
-    float3 position;
-    float3 velocity;
-    float4 color;
-};
-struct Ring
-{
-    float4 color;
-    int density;
-    int width;
-};
-
-RWStructuredBuffer<Particle> particles;
-RWStructuredBuffer<Ring> rings;
-RWStructuredBuffer<Planet> planets;
-
-float particleCount;
-int ringCount;
-int planetCount;
-float startRingDistance;
-
-float timeStep;
-float time;
-
-int parentPlanetID;
-    
-bool firstLoop;
-
-float ringWidthOffset;
-
-float3 RandomVector()
-{
-    float random1 = frac(sin(dot(time, float2(12.9898, 78.233))) * 43758.5453);
-    float random2 = frac(sin(dot(time, float2(94.9013, 72.623))) * 63456.1789);
-    float random3 = frac(sin(dot(time, float2(78.233, 45.5019))) * 87651.3342);
-    return float3(random1, random2, random3);
-}
-
-float RandomFloat()
-{
-    return frac(sin(dot(time * 2, float2(12.9898, 78.233))) * 43758.5453);
-}
-
-int GetRingIndex(int particleID)
-{
-    int index;
-    int particlesCheck;
-    for (int i = 0; i < ringCount; i++)
+    struct OrbitData
     {
-        particlesCheck += rings[i].density;
-        if (particleID <= particlesCheck)
+        float fakeActive;
+        float distance;
+        float angle;
+    };
+    struct Planet
+    {
+        float3 position;
+        float mass;
+        float radius;
+    };
+    struct Particle
+    {
+        float3 position;
+        float3 velocity;
+        float4 color;
+        OrbitData orbitData;
+    };
+    struct Ring
+    {
+        float4 color;
+        int density;
+        int width;
+    };
+    
+    RWStructuredBuffer<Particle> particles;
+    RWStructuredBuffer<Ring> rings;
+    RWStructuredBuffer<Planet> planets;
+
+    float particleCount;
+    int ringCount;
+    int planetCount;
+    float startRingDistance;
+
+    float timeStep;
+    float time;
+    
+    float randOffset;
+
+    int parentPlanetID;
+    float parentPlanetPitch;
+    
+    bool firstLoop;
+
+    float ringWidthOffset;
+    
+    //float3 RandomVector()
+    //{
+    //    float random1 = frac(sin(dot(time, float2(12.9898, 78.233))) * 43758.5453);
+    //    float random2 = frac(sin(dot(time, float2(94.9013, 72.623))) * 63456.1789);
+    //    float random3 = frac(sin(dot(time, float2(78.233, 45.5019))) * 87651.3342);
+    //    return float3(random1, random2, random3);
+    //} 
+    //float RandomFloat01(float seed)
+    //{
+    //    float2 uv = float2(seed, 0);
+    //    float rand = frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
+    //    return rand;
+    //}  
+    //float RandomFloatN1N2(float seed, float from, float to)
+    //{
+    //    float2 uv = float2(seed, 0);
+    //    float rand = frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);     
+    //    return rand * (to - from) + from;
+    //}
+    
+    uint Hash(uint s)
+    {
+        s ^= 2747636419u;
+        s *= 2654435769u;
+        s ^= s >> 16;
+        s *= 2654435769u;
+        s ^= s >> 16;
+        s *= 2654435769u;
+        return s;
+    }
+
+    float RandomFloat01(uint seed)
+    {
+        return float(Hash(seed)) / 4294967295.0; // 2^32-1
+    }
+    float RandomFloatN1N2(uint seed, float from, float to)
+    {
+        float rand = Hash(seed) / 4294967295.0;
+        return rand * (to - from) + from;
+    }
+
+    int GetRingIndex(int particleID)
+    {
+        int index;
+        int particlesCheck;
+        for (int i = 0; i < ringCount; i++)
         {
-            index = i;
-            break;
+            particlesCheck += rings[i].density;
+            if (particleID <= particlesCheck)
+            {
+                index = i;
+                break;
+            }
         }
+        return index;
     }
-    return index;
-}
-
-int RingRelativeID(int ringID, int particleID)
-{
-    int relativeID = particleID;
-    
-    for (int i = 0; i < ringID; i++)
+   
+    int RingRelativeID(int ringID, int particleID)
     {
-        relativeID -= rings[i].density;
+        int relativeID = particleID;
+    
+        for (int i = 0; i < ringID; i++)
+        {
+            relativeID -= rings[i].density;
+        }
+        return relativeID;
     }
-    return relativeID;
-}
 
-float CalcRingDistance(int ringID, int particleID)
-{
-    float distance = 0;
-    distance += planets[parentPlanetID].radius + startRingDistance;
-    
-    float ringWidthRow = floor(RingRelativeID(ringID, particleID) / (rings[ringID].density / (rings[ringID].width)));;
-    float widthOffset = ringWidthRow * ringWidthOffset;
-    distance += widthOffset;
-    
-    float offset = 0;
-    for (int i = 0; i < ringID; i++)
+    float CalcRingDistance(int ringID, int particleID)
     {
-        offset += (rings[i].width + 10) * ringWidthOffset;
+        float distance = 0;
+        distance += planets[parentPlanetID].radius + startRingDistance;
+    
+        float ringWidthRow = floor(RingRelativeID(ringID, particleID) / (rings[ringID].density / (rings[ringID].width)));;
+        float widthOffset = ringWidthRow * ringWidthOffset;
+        distance += widthOffset;
+    
+        return distance;
     }
-    distance += offset;
     
-    return distance;
-}
-
-float2 World3DToScreen2D(float3 worldPos3D)
-{
-    float4 posClip = mul(projectionMatrix, float4(worldPos3D, 1)).xyzw;
-    posClip /= posClip.w;
-    float2 halfCam = camSize * 0.5f;
-    return float2((posClip.x * halfCam.x) + halfCam.x, (posClip.y * halfCam.y) + halfCam.y);
-}
-
-float Linear01DepthC(float depth)
-{
-    float near = camNearClipPlane;
-    float far = camFarClipPlane;
-    return (2.0 * near) / (far + near - depth * (far - near));
-}
-
-[numthreads(256, 1, 1)]
-void CalcRings(uint3 id : SV_DispatchThreadID)
-{
-    if (id.x < 0 || id.x >= particleCount)
-        return;
+    float GetRingStartDistance(int ringID, int particleID)
+    {
+        float distance = 0;
+        distance += planets[parentPlanetID].radius + startRingDistance;
+        
+        float offset = 0;
+        for (int i = 0; i < ringID; i++)
+        {
+            offset += (rings[i].width + 50) * ringWidthOffset;
+        }
+        distance += offset;
     
-    int currentID = id.x;
-    Particle p = particles[currentID];
+        return distance;
+    }
+
+    float4 CalcParticleColor(int particleID, int ringID, float distance)
+    {
+        float4 color = rings[ringID].color;
+        color.w = 1;
+        
+        float minDist = GetRingStartDistance(ringID, particleID);
+        float maxDist = 19.25;
+
+        float xCord = ((distance - minDist) / (maxDist - minDist)) * 181;
+        color = ringStripTexture[float2(xCord, 12)];
+
+        return color;
+    }
+
+    float2 World3DToScreen2D(float3 worldPos3D)
+    {
+        float4 posClip = mul(projectionMatrix, float4(worldPos3D, 1)).xyzw;
+        posClip /= posClip.w;
+        float2 halfCam = camSize * 0.5f;
+
+        return float2((posClip.x * halfCam.x) + halfCam.x, (posClip.y * halfCam.y) + halfCam.y);
+    }
+
+    float Linear01DepthC(float depth)
+    {
+        float near = camNearClipPlane;
+        float far = camFarClipPlane;
+        return (2.0 * near) / (far + near - depth * (far - near));
+    }
+    
+    
+    float3 ProjectOnPlane(float3 planeVector, float3 planeNormal)
+    {
+        float3 projection = dot(planeVector, planeNormal) * planeNormal;
+        float3 projectedVector = planeVector - projection;
+        return projectedVector;
+    }
+        
+    float3 RotateAboutAxis(float3 In, float3 Axis, float Rotation)
+    {
+        Rotation = radians(Rotation);
+        float s = sin(Rotation);
+        float c = cos(Rotation);
+        float one_minus_c = 1.0 - c;
+
+        Axis = normalize(Axis);
+        float3x3 rot_mat =
+        {
+            one_minus_c * Axis.x * Axis.x + c, one_minus_c * Axis.x * Axis.y - Axis.z * s, one_minus_c * Axis.z * Axis.x + Axis.y * s,
+        one_minus_c * Axis.x * Axis.y + Axis.z * s, one_minus_c * Axis.y * Axis.y + c, one_minus_c * Axis.y * Axis.z - Axis.x * s,
+        one_minus_c * Axis.z * Axis.x - Axis.y * s, one_minus_c * Axis.y * Axis.z + Axis.x * s, one_minus_c * Axis.z * Axis.z + c
+        };
+        return mul(rot_mat, In);
+    }
+    
+    [numthreads(512, 1, 1)]
+    void CalcRings(uint3 id : SV_DispatchThreadID)
+    {
+        if (id.x < 0 || id.x >= particleCount)
+            return;
+    
+        int currentID = id.x;
+        int randomID = RandomFloatN1N2(currentID, 0, particleCount);
+        Particle p = particles[currentID];
+        Planet parentPlanet = planets[parentPlanetID];
       
-    if (firstLoop)
-    {             
-        int ringIndex = GetRingIndex(currentID);
-                  
-        ringWidthOffset = 0.1f;
-        float distance = CalcRingDistance(ringIndex, currentID);
-        
-        float heightOffset = planets[parentPlanetID].position.y;
-        
-        float angle = 360.0 / (rings[ringIndex].density / rings[ringIndex].width) * RingRelativeID(ringIndex, currentID);
-        angle = angle * (PI / 180);
-        
-        p.position = float3(cos(angle) * distance + planets[parentPlanetID].position.x, heightOffset, sin(angle) * distance + planets[parentPlanetID].position.z);
-                                      
-        //calculate initial velocity for perfect orbit based on distance
-        float3 forceDirection = planets[parentPlanetID].position - p.position;
-        float forceDirectionLength = length(forceDirection);
-        float3 unitPerpVector = normalize(float3(forceDirection.z, forceDirection.y, -forceDirection.x));
-        float centForce = (gravConstant * (planets[parentPlanetID].mass * particleMass)) / sqrt(forceDirectionLength);
-                 
-        p.velocity = (unitPerpVector * centForce);
-        p.color = rings[ringIndex].color;
-        p.color.w = 1;
-    }
-     
-    //calculate newton
-       
-    float3 forceVector;
-    bool collided = false;
-        
-    for (int i = 0; i < planetCount; i++)
-    {
-        float3 forceDirection = planets[i].position - p.position;
-        float forceDirectionLength = length(forceDirection);
-        float gravityForce = gravConstant * (planets[i].mass * particleMass) / (forceDirectionLength * forceDirectionLength);
-        forceVector += normalize(forceDirection) * gravityForce;
+        if (firstLoop)
+        {
+            p.orbitData.fakeActive = 1;
             
-        //"disable" particle if collided with planet
-        if (forceDirectionLength < planets[i].radius)
+            int ringID = GetRingIndex(currentID);
+                  
+            ringWidthOffset = 0.01;
+            startRingDistance = parentPlanet.radius / 10 + startRingDistance;
+            //float distance = CalcRingDistance(ringID, currentID);
+            
+            float distance = GetRingStartDistance(ringID, currentID);
+            float maxDistance = ringWidthOffset * rings[ringID].width;
+            distance += RandomFloatN1N2(randomID, 0, maxDistance);
+                    
+            p.orbitData.distance = distance;
+            
+            float heightOffset = parentPlanet.position.y;
+            
+            //float angle = 360.0 / (rings[ringID].density / rings[ringID].width) * RingRelativeID(ringID, currentID);
+            float angle = RandomFloatN1N2(currentID, 0, 360);
+            p.orbitData.angle = angle;
+            angle = angle * (PI / 180);
+        
+            p.position = float3(cos(angle) * distance + parentPlanet.position.x, heightOffset, sin(angle) * distance + parentPlanet.position.z);
+                                                          
+            p.color = CalcParticleColor(currentID, ringID, distance);
+        }
+     
+        //calculate newton     
+        float3 totalForceVector = float3(0, 0, 0);
+        float3 parentPlanetForce = float3(0, 0, 0);
+        
+        for (int i = 0; i < planetCount; i++)
         {
-            //p.velocity = float3(0, 0, 0);
-            //forceVector = float3(0, 0, 0);
-            //p.position = planets[i].position + forceDirection;
-            collided = true;
+            Planet planetI = planets[i];
+            float3 forceDirection = planetI.position - p.position;
+            float forceDirectionLength = length(forceDirection);
+            float gravityForce = gravConstant * (planetI.mass * particleMass) / (forceDirectionLength * forceDirectionLength);
+
+            float3 planetForce = normalize(forceDirection) * gravityForce;
+            totalForceVector += planetForce;
+            
+            if (i == parentPlanetID)
+            {
+                parentPlanetForce = planetForce;
+            }
+                        
+            //collision
+            if (forceDirectionLength < planetI.radius)
+            {
+                p.position = planetI.position + forceDirection;
+                totalForceVector -= planetForce;
+                p.velocity = float3(0, 0, 0);
+            }
+        }
+
+        float particleBreakPoint = 0.1;
+        
+        if (length(totalForceVector - parentPlanetForce) > particleBreakPoint && p.orbitData.fakeActive == 1)
+        {            
+            p.orbitData.fakeActive = 0;
+
+            float3 tempUp = RotateAboutAxis(float3(0, 1, 0), float3(1, 0, 0), parentPlanetPitch);
+            
+            float3 forceDirection = parentPlanet.position - p.position;
+            float3 unitPerpVector = -forceDirection;
+            unitPerpVector = RotateAboutAxis(unitPerpVector, tempUp, -90);
+            
+            float centForce = sqrt(gravConstant * parentPlanet.mass / p.orbitData.distance) * 7;
+            p.velocity = (normalize(unitPerpVector) * centForce);
+        }
+                 
+        if (p.orbitData.fakeActive == 1)
+        {
+            p.orbitData.angle += 2;
+            float radiansAngle = p.orbitData.angle * (PI / 180);
+            float tiltAngle = radians(-parentPlanetPitch);
+
+            float cosTilt = cos(tiltAngle);
+            float sinTilt = sin(tiltAngle);
+
+            float x = cos(radiansAngle) * p.orbitData.distance;
+            float y = sin(radiansAngle) * p.orbitData.distance * sinTilt;
+            float z = sin(radiansAngle) * p.orbitData.distance * cosTilt;
+
+            p.position = planets[parentPlanetID].position + float3(x, y, z);
+        }
+        else
+        {
+            p.velocity += totalForceVector;
+            p.position += p.velocity * timeStep;
+        }
+         
+        float2 particleScreenPos = World3DToScreen2D(p.position);
+        
+        particles[currentID] = p;
+          
+        float depthValue = Linear01Depth(camDepthTexture[particleScreenPos].r) * camFarClipPlane;
+        float posZ = mul(projectionMatrix, float4(p.position, 1)).z;
+    
+        //dont render if out planes
+        if (posZ > camFarClipPlane || posZ < camNearClipPlane)
+        {
+            return;
+        }
+        //dont render if obstructed
+        if (posZ >= depthValue)
+        {
+            return;
+        }
+        
+        //make particle size bigger
+        int particleSize = 0;
+        
+        if (posZ < 25) particleSize = 1;
+        
+        float2 drawOffset = float2(-particleSize, -particleSize);
+        int sizeRepeatCount = (particleSize * 2 + 1) * (particleSize * 2 + 1);
+        int SRCsqrt = sqrt(sizeRepeatCount);
+        
+        //render    
+        if (particleSize > 0)
+        {
+            for (int j = 0; j < sizeRepeatCount; j++)
+            {
+                if (j % SRCsqrt == 0 && j != 0)
+                {
+                    drawOffset.y++;
+                    drawOffset.x = -particleSize;
+                }
+                float2 drawPos = particleScreenPos + drawOffset;
+                particlesTexture[drawPos] = p.color;
+                drawOffset.x++;
+            }
+        }
+        else
+        {
+            particlesTexture[particleScreenPos] = p.color;
         }
     }
-          
-    //set velocity and position using newton
-    if(!collided)
-    {
-        p.velocity += forceVector;
-        p.position += p.velocity * timeStep;
-    }
-             
-    float2 particleScreenPos = World3DToScreen2D(p.position);
-      
-    particles[currentID] = p;
-          
-    float depthValue = Linear01Depth(camDepthTexture[particleScreenPos].r) * camFarClipPlane;
-    float posZ = mul(projectionMatrix, float4(p.position, 1)).z;
     
+  
 
-    //Dont render if out planes
-    if (posZ > camFarClipPlane || posZ < camNearClipPlane)
+    [numthreads(8, 8, 1)]
+    void ClearFrame(uint3 id : SV_DispatchThreadID)
     {
-        return;
+        //clear texture
+        particlesTexture[id.xy] = float4(0, 0, 0, 0);
     }
-    
-    //dont render if obstructed
-    if (posZ > depthValue)
-    {
-        return;
-    }
-    
-    //render
-    particlesTexture[particleScreenPos] = p.color;        
-}
-
-[numthreads(8, 8, 1)]
-void ClearFrame(uint3 id : SV_DispatchThreadID)
-{
-    //clear texture
-    particlesTexture[id.xy] = float4(0, 0, 0, 0); 
-}
    

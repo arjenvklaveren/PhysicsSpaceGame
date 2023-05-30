@@ -22,10 +22,11 @@ public class BodyRings : MonoBehaviour
     private ComputeBuffer particlesBuffer;
     private ComputeBuffer ringsBuffer;
     private ComputeBuffer planetBuffer;
+    private ComputeBuffer fakeOrbitBuffer;
 
     private int particleCount;
     private int planetCount;
-    public float ringStartDistance;
+    public float ringStartOffset;
 
     int kernelID;
     uint threadGroupSize;
@@ -34,13 +35,17 @@ public class BodyRings : MonoBehaviour
     bool firstLoop = true;
 
     Texture depthTex;
+    public Texture ringStrip;
     Camera cam;
+
+    float rotateValue;
 
     struct Particle
     {
         public Vector3 position;
         public Vector3 velocity;
         public Vector4 color;
+        public OrbitData orbitData;
     }
     public struct Ring
     {
@@ -53,6 +58,12 @@ public class BodyRings : MonoBehaviour
         public Vector3 position;
         public float mass;
         public float radius;
+    }
+    public struct OrbitData
+    {
+        public float fakeActive;
+        public float distance;
+        public float angle;
     }
 
     void Start()
@@ -87,7 +98,7 @@ public class BodyRings : MonoBehaviour
         ringShader.SetTexture(1, "particlesTexture", particlesTexture);
 
         cam.depthTextureMode = DepthTextureMode.Depth;
-        OnRenderEvent.OnRenderImageEvent += OnRenderCam;        
+        OnRenderEvent.OnRenderImageEvent += OnRenderCam;
     }
 
     void FixedUpdate()
@@ -113,28 +124,32 @@ public class BodyRings : MonoBehaviour
         {
             planets[i].position = CelestialBodyManager.bodies[i].transform.position;
             planets[i].radius = CelestialBodyManager.bodies[i].transform.lossyScale.x / 2;
-            planets[i].mass = 5000;
+            planets[i].mass = CelestialBodyManager.bodies[i].mass;
         }
     }
 
     void SetStartVariables()
     {
+        float rand = Random.Range(0, 1000000) * System.DateTime.Now.Millisecond / 100000;
         ringShader.SetBool("firstLoop", true);
         ringShader.SetFloat("particleCount", particleCount);
         ringShader.SetFloat("timeStep", Universe.timeStep);
+        ringShader.SetFloat("randOffset", rand);
         ringShader.SetFloat("gravConstant", Universe.G);
         ringShader.SetInt("ringCount", rings.Length);
         ringShader.SetFloat("camFarClipPlane", cam.farClipPlane);
         ringShader.SetFloat("camNearClipPlane", cam.nearClipPlane);
-        ringShader.SetFloat("startRingDistance", ringStartDistance);
+        ringShader.SetFloat("startRingDistance", ringStartOffset);
         ringShader.SetInt("parentPlanetID", parentPlanetID);
+        ringShader.SetFloat("parentPlanetPitch", CelestialBodyManager.bodies[parentPlanetID].transform.eulerAngles.x);
         ringShader.SetInt("planetCount", planetCount);
+        ringShader.SetTexture(0, "ringStripTexture", ringStrip);
     }
 
     void SetBuffers()
     {
         particles = new Particle[particleCount];
-        particlesBuffer = new ComputeBuffer(particleCount, sizeof(float) * 10);
+        particlesBuffer = new ComputeBuffer(particleCount, sizeof(float) * 13);
         ringShader.SetBuffer(kernelID, "particles", particlesBuffer);
         particlesBuffer.SetData(particles);
 
@@ -158,10 +173,14 @@ public class BodyRings : MonoBehaviour
         {
             planets[i].position = CelestialBodyManager.bodies[i].transform.position;
         }
+
+        rotateValue++;
+
         planetBuffer.SetData(planets);
         
         ringShader.SetVector("camSize", new Vector2(cam.pixelWidth, cam.pixelHeight));
         ringShader.SetFloat("time", Time.time + Random.Range(0.0f, 100.0f));
+        ringShader.SetFloat("rotateDegrees", rotateValue);
         ringShader.SetMatrix("projectionMatrix", cam.projectionMatrix * cam.worldToCameraMatrix);           
         ringShader.SetTexture(0, "camDepthTexture", depthTex);          
 
@@ -177,8 +196,8 @@ public class BodyRings : MonoBehaviour
 
     private void OnDestroy()
     {
-        //particlesBuffer.Dispose();
-        //ringsBuffer.Dispose();
-        //planetBuffer.Dispose();
+        particlesBuffer.Dispose();
+        ringsBuffer.Dispose();
+        planetBuffer.Dispose();
     }
 }

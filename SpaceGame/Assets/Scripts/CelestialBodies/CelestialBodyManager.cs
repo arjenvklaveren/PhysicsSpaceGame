@@ -17,6 +17,7 @@ public class CelestialBodyManager : MonoBehaviour
     {
         AddNewton();
         DetectCollision();
+        //if (bodies[1].transform.position.x < 1) bodies[1].transform.position = new Vector3 (-10000, 0, 100000);
     }
 
     void DetectCollision()
@@ -46,6 +47,7 @@ public class CelestialBodyManager : MonoBehaviour
             forceDirection.Normalize();
 
             //force magnitude
+
             float force = Universe.G * (globe.mass * CB.mass) / (forceDirectionLength * forceDirectionLength);
 
             //force vector
