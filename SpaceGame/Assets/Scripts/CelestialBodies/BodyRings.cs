@@ -7,10 +7,12 @@ using System.Linq;
 
 public class BodyRings : MonoBehaviour
 {
-    public PlanetRing[] rings;
+    [RangeEx(0.25f, 4f, 0.25f), SerializeField] public float ringWidth = 1f;
+    [RangeEx(0f, 2f, 0.25f), SerializeField] public float ringOffset = 0.25f;
+
+    int ringDensity;
 
     Particle[] particles;
-    Ring[] ringsS;
     Planet[] planets;
 
     int parentPlanetID;
@@ -20,13 +22,9 @@ public class BodyRings : MonoBehaviour
     RenderTexture particlesTexture;
 
     private ComputeBuffer particlesBuffer;
-    private ComputeBuffer ringsBuffer;
     private ComputeBuffer planetBuffer;
-    private ComputeBuffer fakeOrbitBuffer;
 
-    private int particleCount;
     private int planetCount;
-    public float ringStartOffset;
 
     int kernelID;
     uint threadGroupSize;
@@ -35,10 +33,18 @@ public class BodyRings : MonoBehaviour
     bool firstLoop = true;
 
     Texture depthTex;
-    public Texture ringStrip;
+    Texture2D ringTex;
+
+    [HideInInspector] public List<Color32> ringTexData;
+
     Camera cam;
 
-    float rotateValue;
+    float renderValue;
+
+    DrawPlaneTexture planeRingTex;
+
+    public bool OpenWindowButton;
+    private bool prev;
 
     struct Particle
     {
@@ -46,12 +52,6 @@ public class BodyRings : MonoBehaviour
         public Vector3 velocity;
         public Vector4 color;
         public OrbitData orbitData;
-    }
-    public struct Ring
-    {
-        public Vector4 color;
-        public int density;
-        public int width;
     }
     public struct Planet
     {
@@ -66,12 +66,27 @@ public class BodyRings : MonoBehaviour
         public float angle;
     }
 
+    private void OnValidate()
+    {
+        ringTex = Resources.Load<Texture2D>("Images/RingStrip");
+        if (OpenWindowButton != prev)
+        {
+            prev = OpenWindowButton;
+            TextureDrawWindow.Open(this);
+        }
+        if(ringTexData.Count == 0)
+        {
+            SetRingTextureData(ringTex);          
+        }
+        SetPlaneTexture();
+    }
+
     void Start()
     {
-        if (rings.Length < 1) return;
-
         ringShader = (ComputeShader)Instantiate(Resources.Load<ComputeShader>("Shaders/Compute/RingsCompute"));
         particleMaterial = Resources.Load<Material>("Materials/Alpha");
+        planeRingTex = GetComponentInChildren<DrawPlaneTexture>();
+        planeRingTex.gameObject.SetActive(false);
 
         kernelID = ringShader.FindKernel("CalcRings");
         cam = Camera.main;
@@ -80,16 +95,22 @@ public class BodyRings : MonoBehaviour
         parentPlanetID = CelestialBodyManager.bodies.IndexOf(GetComponent<CelestialBody>());
         planets = new Planet[planetCount];
 
+
+        float scaleLerp = Mathf.InverseLerp(10, 1000, transform.lossyScale.x);
+        float startDensity = Mathf.Lerp(100000, 1000000, scaleLerp);
+        ringDensity = (int)(startDensity * (ringWidth + ringOffset));
+
+
         SetArrayData();
         SetStartVariables();
         SetBuffers();
 
         ringShader.GetKernelThreadGroupSizes(kernelID, out threadGroupSize, out _, out _);
-        threadGroups = (int)((particleCount + (threadGroupSize - 1)) / threadGroupSize);
+        threadGroups = (int)((ringDensity + (threadGroupSize - 1)) / threadGroupSize);
 
         if (particlesTexture == null)
         {
-            particlesTexture = new RenderTexture(Screen.width, Screen.height, 32, RenderTextureFormat.ARGB32);
+            particlesTexture = new RenderTexture(1920, 1080, 32, RenderTextureFormat.ARGB32);
             particlesTexture.enableRandomWrite = true;
             particlesTexture.Create();
         }
@@ -111,15 +132,6 @@ public class BodyRings : MonoBehaviour
 
     void SetArrayData()
     {
-        ringsS = new Ring[rings.Length];
-        for (int i = 0; i < rings.Length; i++)
-        {
-            particleCount += rings[i].density;
-
-            ringsS[i].color = rings[i].ringColor;
-            ringsS[i].density = rings[i].density;
-            ringsS[i].width = rings[i].width;
-        }
         for (int i = 0; i < planetCount; i++)
         {
             planets[i].position = CelestialBodyManager.bodies[i].transform.position;
@@ -132,37 +144,34 @@ public class BodyRings : MonoBehaviour
     {
         float rand = Random.Range(0, 1000000) * System.DateTime.Now.Millisecond / 100000;
         ringShader.SetBool("firstLoop", true);
-        ringShader.SetFloat("particleCount", particleCount);
+        ringShader.SetFloat("particleCount", ringDensity);
+        ringShader.SetFloat("ringWidth", transform.lossyScale.x * (1 / Universe.scaleMultiplier) * ringWidth);
         ringShader.SetFloat("timeStep", Universe.timeStep);
         ringShader.SetFloat("randOffset", rand);
         ringShader.SetFloat("gravConstant", Universe.G);
-        ringShader.SetInt("ringCount", rings.Length);
         ringShader.SetFloat("camFarClipPlane", cam.farClipPlane);
         ringShader.SetFloat("camNearClipPlane", cam.nearClipPlane);
-        ringShader.SetFloat("startRingDistance", ringStartOffset);
+        ringShader.SetFloat("startRingDistance", ringOffset);
         ringShader.SetInt("parentPlanetID", parentPlanetID);
         ringShader.SetFloat("parentPlanetPitch", CelestialBodyManager.bodies[parentPlanetID].transform.eulerAngles.x);
         ringShader.SetInt("planetCount", planetCount);
-        ringShader.SetTexture(0, "ringStripTexture", ringStrip);
+        ringShader.SetTexture(0, "ringStripTexture", GetRingTextureFromData());
     }
 
     void SetBuffers()
     {
-        particles = new Particle[particleCount];
-        particlesBuffer = new ComputeBuffer(particleCount, sizeof(float) * 13);
+        particles = new Particle[ringDensity];
+        particlesBuffer = new ComputeBuffer(ringDensity, sizeof(float) * 13);
         ringShader.SetBuffer(kernelID, "particles", particlesBuffer);
         particlesBuffer.SetData(particles);
 
-        ringsBuffer = new ComputeBuffer(rings.Length + 1, sizeof(float) * 6);
-        ringShader.SetBuffer(kernelID, "rings", ringsBuffer);
-        ringsBuffer.SetData(ringsS);
-      
         planetBuffer = new ComputeBuffer(CelestialBodyManager.bodies.Count, sizeof(float) * 5);
         ringShader.SetBuffer(0, "planets", planetBuffer);
     }
 
     void OnRenderCam(RenderTexture src, RenderTexture dest)
-    {      
+    {
+        //Graphics.Blit(testTex, particlesTexture);
         Graphics.Blit(particlesTexture, dest, particleMaterial);
         depthTex = Shader.GetGlobalTexture("_CameraDepthTexture");
     }
@@ -174,15 +183,15 @@ public class BodyRings : MonoBehaviour
             planets[i].position = CelestialBodyManager.bodies[i].transform.position;
         }
 
-        rotateValue++;
-
         planetBuffer.SetData(planets);
         
         ringShader.SetVector("camSize", new Vector2(cam.pixelWidth, cam.pixelHeight));
         ringShader.SetFloat("time", Time.time + Random.Range(0.0f, 100.0f));
-        ringShader.SetFloat("rotateDegrees", rotateValue);
-        ringShader.SetMatrix("projectionMatrix", cam.projectionMatrix * cam.worldToCameraMatrix);           
-        ringShader.SetTexture(0, "camDepthTexture", depthTex);          
+        ringShader.SetFloat("renderValue", renderValue);
+        ringShader.SetMatrix("projectionMatrix", cam.projectionMatrix * cam.worldToCameraMatrix);
+
+        //Todo maybe not update
+        ringShader.SetTexture(0, "camDepthTexture", depthTex);
 
         ringShader.Dispatch(1, cam.pixelWidth / 8, cam.pixelHeight / 8, 1);
         ringShader.Dispatch(kernelID, threadGroups, 1, 1);
@@ -194,10 +203,54 @@ public class BodyRings : MonoBehaviour
         }
     }
 
+    public void SetRingTextureData(Texture2D texture)
+    {
+        ringTexData.Clear();
+        List<Color32> temp = new List<Color32>();
+        for(int i = 0; i < texture.width; i++)
+        {
+            temp.Add(texture.GetPixel(i, 1));
+        }
+        SetRingTextureData(temp);
+    }
+    public void SetRingTextureData(List<Color32> data)
+    {
+        ringTexData = data;
+        SetPlaneTexture();       
+    }
+    public void ResetRingTextureData()
+    {
+        SetRingTextureData(ringTex);
+    }
+
+    public Texture2D GetRingTextureFromData()
+    {
+        Texture2D texture = new Texture2D(1000, 1);
+        for(int i = 0; i < ringTexData.Count; i++)
+        {
+            texture.SetPixel(i, 1, ringTexData[i]);
+        }
+        texture.Apply();
+        return texture;
+    }
+
+    public List<Color32> GetRingTextureData()
+    {
+        return ringTexData;
+    }
+
+    void SetPlaneTexture()
+    {
+        if (transform.gameObject.activeSelf == true)
+        {
+            planeRingTex = GetComponentInChildren<DrawPlaneTexture>();
+            planeRingTex.SetTexture(GetRingTextureFromData());
+        }
+    }
+
     private void OnDestroy()
     {
         particlesBuffer.Dispose();
-        ringsBuffer.Dispose();
         planetBuffer.Dispose();
     }
 }

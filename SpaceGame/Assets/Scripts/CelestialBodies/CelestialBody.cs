@@ -4,8 +4,10 @@ using UnityEngine;
 
 public class CelestialBody : MonoBehaviour
 {
+    [RangeEx(100, 50000, 100)] public int mass = 100000;
+    [RangeEx(1, 100), SerializeField] private int scaleMass = 100;
+    [Range(-180, 180), SerializeField] private int tilt = 0;
     public Vector3 initialVelocity;
-    public float mass;
 
     [HideInInspector] public Vector3 velocity;
 
@@ -16,7 +18,12 @@ public class CelestialBody : MonoBehaviour
 
     private void OnValidate()
     {
-        transform.localScale = new Vector3(0.02f, 0.02f, 0.02f) * mass;
+        float scaleTemp = 0.01f * scaleMass;
+        float scale = mass * Universe.scaleMultiplier * scaleTemp;
+        if (scale > Universe.maxScale) scale = Universe.maxScale;
+        if (scale < Universe.minScale) scale = Universe.minScale;
+        transform.localScale = new Vector3(scale, scale, scale);
+        transform.eulerAngles = new Vector3(tilt, 0, 0);
     }
 
     public void AddForce(Vector3 force)
@@ -25,7 +32,7 @@ public class CelestialBody : MonoBehaviour
     }
 
     public void UpdatePosition()
-    {
+    {      
         transform.position += velocity * Universe.timeStep;
     }
 }

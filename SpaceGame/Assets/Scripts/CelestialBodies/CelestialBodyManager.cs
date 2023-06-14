@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using TMPro;
 
 public class CelestialBodyManager : MonoBehaviour
 {
@@ -13,11 +14,15 @@ public class CelestialBodyManager : MonoBehaviour
         bodies = bodiesClone;
     }
 
-    void FixedUpdate()
+    private void Awake()
     {
+        bodies = bodiesClone;
+    }
+
+    void FixedUpdate()
+    {      
         AddNewton();
-        DetectCollision();
-        //if (bodies[1].transform.position.x < 1) bodies[1].transform.position = new Vector3 (-10000, 0, 100000);
+        DetectCollision();     
     }
 
     void DetectCollision()
@@ -30,7 +35,7 @@ public class CelestialBodyManager : MonoBehaviour
         for (int i = 0; i < bodies.Count; i++)
         {
             bodies[i].AddForce(CalculateNewton(bodies[i]));        
-            bodies[i].UpdatePosition();        
+            bodies[i].UpdatePosition();
         }
     }
 

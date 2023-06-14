@@ -1,0 +1,32 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+RWTexture2D<float4> RingStrip;
+float2 resolution;
+
+float planetRadius;
+float ringWidth;
+float ringOffset;
+
+float invLerp(float from, float to, float value)
+{
+    return (value - from) / (to - from);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float4 endColor = float4(1, 0, 0, 1);
+    float2 centre = float2(resolution.x / 2, resolution.y / 2);
+    float2 pos = float2(id.x, id.y);
+    float distFromCentre = length(pos - centre);
+    float ringScale = 0.1 + (0.1 * (ringWidth + ringOffset));
+    float ringRadiusScale = planetRadius * (0.2 / ringScale);
+    float offsetDistance = ringRadiusScale + (ringRadiusScale * ringOffset);
+    
+    float invLerpCoord = invLerp(offsetDistance, 1000, distFromCentre);
+    float ringStripCoord = lerp(0, 1000, invLerpCoord);
+    endColor = RingStrip[float2(ringStripCoord * 2, 0)];
+    
+    Result[id.xy] = float4(1, 0, 0, 1);
+}

@@ -33,7 +33,6 @@ public class CelestialBodyPredictor : MonoBehaviour
             paths.Add(CelestialBodyManager.bodies[i].GetComponent<LineRenderer>());
             paths[i].startColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
             paths[i].endColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
-            paths[i].widthMultiplier = 0.1f;
             pointArrayList.Add(new List<Vector3>());
 
             if (relativeToBody != null && bodyClone.position == relativeToBody.transform.position) relativeIndex = i; 
