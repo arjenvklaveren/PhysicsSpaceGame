@@ -42,14 +42,16 @@ public class TextureDrawWindow : EditorWindow
     public static void Open(RingTexture ringTex_, BodyRings ring)
     {
         window = GetWindow<TextureDrawWindow>("Ring editor");
-        window.maxSize = new Vector2(1040f, 500f);
-        window.minSize = new Vector2(1040f, 500f);
+        window.maxSize = new Vector2(1040f, 300f);
+        window.minSize = new Vector2(1040f, 300f);
 
-        ringImage = ringTex_.GetRawTex();
+        ringImage = new Texture2D(1000, 1);
+        ringImage.SetPixels(ringTex_.GetRawTex().GetPixels());
+        ringImage.Apply();
         currentRing = ring;
 
         improvedImage = ringTex_.GetRingTextureFromData();
-        //improvedImage = Resources.Load<Texture2D>("Images/ringStrip");
+        //improvedImage = Resources.Load<Texture2D>("Images/ringStrip);
         alphaImage = Resources.Load<Texture>("Images/alphaBack");      
         alphaMat = Resources.Load<Material>("Materials/Alpha");
 
@@ -57,28 +59,30 @@ public class TextureDrawWindow : EditorWindow
 
         selectXPos = 500;
 
-        SetAlphaFromTex();
+        SetCurveFromTex(improvedImage);
         alphaCurve.SetValuesBasedOnAnchors();
 
         texHistory.Clear();
-        AddTextureToHistory();
-        
+        AddTextureToHistory();      
     }
 
     void OnGUI()
     {
+        if (currentRing == null) this.Close();
         EditorGUI.LabelField(new Rect(5, 0, 200, 20), "Start");
         EditorGUI.LabelField(new Rect(1010, 0, 200, 20), "End");
+        EditorGUI.LabelField(new Rect(465, 2, 200, 15), "Hold [SHIFT] to draw");
+
         EditorGUI.DrawRect(drawRect, Color.black);
         EditorGUI.DrawPreviewTexture(drawRect, ringImage, alphaMat);
         selectXPos = (int)GUI.HorizontalSlider(new Rect(15, 122, 1010, 10), selectXPos, 0, 1000);
 
-        EditorGUI.LabelField(new Rect(20, 160, 200, 20), "Draw Color");
-        drawColor = EditorGUI.ColorField(new Rect(20, 180, 300, 20), drawColor);
+        EditorGUI.LabelField(new Rect(20, 250, 200, 20), "Draw Color");
+        drawColor = EditorGUI.ColorField(new Rect(20, 270, 300, 20), drawColor);
         drawColor.a = 255;
 
-        EditorGUI.LabelField(new Rect(350, 160, 200, 20), "Size");
-        barWidth = EditorGUI.IntSlider(new Rect(350, 180, 200, 20), barWidth, 3, 99);
+        EditorGUI.LabelField(new Rect(350, 250, 200, 20), "Size");
+        barWidth = EditorGUI.IntSlider(new Rect(350, 270, 200, 20), barWidth, 3, 99);
 
         if (barWidth % 2 == 0) barWidth += 1;
 
@@ -92,34 +96,42 @@ public class TextureDrawWindow : EditorWindow
 
         this.Repaint();
 
-        if (GUI.Button(new Rect(575, 180, 110, 20), new GUIContent("Undo")))
+        if (GUI.Button(new Rect(600, 260, 120, 30), new GUIContent("Undo")))
         {
             if (texHistory.Count > 1)
             {
                 texHistory.RemoveAt(texHistory.Count - 1);
-                ringImage.SetPixels(texHistory[texHistory.Count - 1].GetPixels());
+
+                Texture2D newTex = new Texture2D(1000, 1);
+                newTex.SetPixels(texHistory[texHistory.Count - 1].GetPixels());
+                SetCurveFromTex(newTex);
+                for (int i = 0; i < 1000; i++)
+                {
+                    Color newColor = newTex.GetPixel(i, 1);
+                    newColor.a = 1;
+                    newTex.SetPixel(i, 1, newColor);
+                }
+                ringImage.SetPixels(newTex.GetPixels());
                 ringImage.Apply();
+
                 RenderTextureDetail();
             }
         }
-        if (GUI.Button(new Rect(700, 180, 110, 20), new GUIContent("Apply")))
+
+        EditorGUI.DrawRect(new Rect(20, 145, 1000, 100), Color.black);
+        EditorGUI.DrawPreviewTexture(new Rect(20, 145, 1000, 100), alphaImage);
+        EditorGUI.DrawPreviewTexture(new Rect(20, 145, 1000, 100), improvedImage, alphaMat);
+
+        if (GUI.Button(new Rect(750, 260, 120, 30), new GUIContent("Apply")))
         {
             ringTex.SetRingTextureData(improvedImage);
+            ringTex.SetRawTex(ringImage);
             currentRing.SetPlaneTexture();
         }
-        if (GUI.Button(new Rect(825, 180, 110, 20), new GUIContent("Reset")))
+        if (GUI.Button(new Rect(900, 260, 120, 30), new GUIContent("Reset")))
         {
             ResetToDefault();
         }
-        if (GUI.Button(new Rect(950, 180, 65, 20), new GUIContent("Ringify")))
-        {
-            RenderTextureDetail();           
-        }
-
-        EditorGUI.LabelField(new Rect(5, 340, 200, 20), "Result:");
-        EditorGUI.DrawRect(new Rect(20, 365, 1000, 100), Color.black);
-        EditorGUI.DrawPreviewTexture(new Rect(20, 365, 1000, 100), alphaImage);
-        EditorGUI.DrawPreviewTexture(new Rect(20, 365, 1000, 100), improvedImage, alphaMat);
 
         alphaCurve.Draw(window);
 
@@ -133,7 +145,6 @@ public class TextureDrawWindow : EditorWindow
                 isDrawing = true;
             }
         }
-
         if (isDrawing)
         {
             for (int i = 0; i < barWidth; i++)
@@ -142,8 +153,7 @@ public class TextureDrawWindow : EditorWindow
                 if (pixelX > 999) continue;
                 ringImage.SetPixel(pixelX, 1, drawColor);
             }
-            ringImage.Apply();
-            ringTex.SetRawTex(ringImage);
+            ringImage.Apply();         
             RenderTextureDetail();
             this.Repaint();
         }
@@ -159,13 +169,21 @@ public class TextureDrawWindow : EditorWindow
         }
     }
 
-    static void SetAlphaFromTex()
+    public void OnStopDragCurve() 
+    {
+        SetAlphaFromCurve();
+
+        AddTextureToHistory();
+    }
+
+    static void SetCurveFromTex(Texture2D tex)
     {
         for (int i = 0; i < alphaCurve.GetAnchorCount(); i++)
         {
-            float samplePos = improvedImage.GetPixel((int)alphaCurve.GetAnchorMargin() * i, 1).a * 255;
+            float samplePos = tex.GetPixel((int)alphaCurve.GetAnchorMargin() * i, 1).a * 255;
             alphaCurve.SetAnchorValue(i, samplePos);
         }
+        alphaCurve.SetValuesBasedOnAnchors();
     }
     static void SetAlphaFromCurve()
     {
@@ -192,41 +210,44 @@ public class TextureDrawWindow : EditorWindow
     {
         Texture2D texClone = new Texture2D(1000,1);
         texClone.SetPixels(ringImage.GetPixels());
+        for(int i = 0; i < 1000; i++)
+        {
+            Color newColor = texClone.GetPixel(i, 1);
+            newColor.a = improvedImage.GetPixel(i, 1).a;
+            texClone.SetPixel(i, 1, newColor);
+        }
         texClone.Apply();
         texHistory.Add(texClone);
     }
 
     static void ResetToDefault()
     {
-        //Reset raw image
         Texture2D resetTex = new Texture2D(1000, 1);
-        resetTex.SetPixels(Resources.Load<Texture2D>("Images/RingStripRaw").GetPixels());
-        resetTex.Apply();
-        ringTex.SetRawTex(resetTex);
-        ringImage = ringTex.GetRawTex();
+        resetTex.SetPixels(Resources.Load<Texture2D>("Images/ResetRingTex").GetPixels());
+        for(int i = 0; i < 1000; i++)
+        {
+            Color newColor = resetTex.GetPixel(i, 1);
+            newColor.a = 1;
+            ringImage.SetPixel(i, 1, newColor);
+        }
         ringImage.Apply();
-
-        //Set image data based on raw image
+        ringTex.SetRawTex(ringImage);
+        //
+        SetCurveFromTex(resetTex);
         RenderTextureDetail();
-        SetAlphaFromTex();
         AddTextureToHistory();
-        selectXPos = 500;
     }
 
     static void RenderTextureDetail()
     {  
-
         List<PixelBlock> blocks = new List<PixelBlock>();
 
         improvedImage.SetPixels(ringImage.GetPixels());
-        improvedImage.Apply();
-
-        Color prevPixel = improvedImage.GetPixel(0, 1);
-        int prevPos = 0;
-
-        Random.InitState(10);
 
         //Instantiate pixel blocks
+        Color prevPixel = improvedImage.GetPixel(0, 1);
+        int prevPos = 0;
+        Random.InitState(10);
         for (int i = 0; i < 1000; i++)
         {
             Color pixel = improvedImage.GetPixel(i, 1);
@@ -242,7 +263,6 @@ public class TextureDrawWindow : EditorWindow
                 blocks.Add(block);
             }
         }
-
         //Add block details
         foreach (PixelBlock block in blocks)
         {
@@ -276,14 +296,14 @@ public class TextureDrawWindow : EditorWindow
                     loop = true;
                 }
             }
-
             improvedImage.SetPixels(block.startPos, 0, block.width, 1, block.pixels.ToArray());
-            improvedImage.Apply();
         }
         currentRing.blockTest = blocks;
 
+        //Set alpha
         SetAlphaFromCurve();
 
+        //Apply blur algorithm
         Texture2D blurredTex = GaussianBlur.Apply(improvedImage, 10, 10);
         improvedImage.SetPixels(blurredTex.GetPixels());
         improvedImage.Apply();

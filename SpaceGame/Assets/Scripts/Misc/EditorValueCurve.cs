@@ -111,6 +111,26 @@ public class EditorValueCurve
             }
         }
     }
+
+    public bool HasStopDrag()
+    {
+        bool value = false;
+        if(hasStartDrag && !isDragging)
+        {
+            hasStartDrag = false;
+            value = true;
+        }
+        return value;
+    }
+
+    bool MouseIsOutBounds()
+    {
+        bool value = false;
+        Vector2 mousePos = Event.current.mousePosition;
+        if (mousePos.x < 0 || mousePos.x > 1040 || mousePos.y < 0 || mousePos.y > 300) value = true;
+        return value;
+    }
+
     void OnDragAnchors()
     {
         Event e = Event.current;
@@ -143,14 +163,17 @@ public class EditorValueCurve
                 }
             }
         }
-        if (e.type == EventType.MouseUp)
+        if (!isDragging) return;
+        if (e.type == EventType.MouseUp || MouseIsOutBounds())
         {
-            if (e.button == 0 && dragAnchor != null)
+            if (dragAnchor == null) return;
+            if (e.button == 0 || MouseIsOutBounds())
             {
                 dragAnchor.drawColor = Color.white;
                 isDragging = false;
                 hasStartDrag = false;
                 SetValuesBasedOnAnchors();
+                window.OnStopDragCurve();
             }
         }
         if (isDragging && dragAnchor.pos.x != 666)
