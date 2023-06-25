@@ -23,10 +23,17 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float ringScale = 0.1 + (0.1 * (ringWidth + ringOffset));
     float ringRadiusScale = planetRadius * (0.2 / ringScale);
     float offsetDistance = ringRadiusScale + (ringRadiusScale * ringOffset);
-    
+        
     float invLerpCoord = invLerp(offsetDistance, 1000, distFromCentre);
     float ringStripCoord = lerp(0, 1000, invLerpCoord);
-    endColor = RingStrip[float2(ringStripCoord * 2, 0)];
     
-    Result[id.xy] = float4(1, 0, 0, 1);
+    endColor = RingStrip[float2(ringStripCoord * 2, 0)];
+    float4 addColor = float4((1.0f - endColor.r) * endColor.a, (1.0f - endColor.g) * endColor.a, (1.0f - endColor.b) * endColor.a, 0);
+    if (addColor.r > 255) addColor.r = 255;
+    if (addColor.g > 255) addColor.g = 255;
+    if (addColor.b > 255) addColor.b = 255;
+    
+    if (invLerpCoord <= 0) endColor = float4(0, 0, 0, 0);
+    
+    Result[id.xy] = endColor;
 }

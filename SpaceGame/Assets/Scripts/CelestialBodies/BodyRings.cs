@@ -33,9 +33,8 @@ public class BodyRings : MonoBehaviour
     bool firstLoop = true;
 
     Texture depthTex;
-    Texture2D ringTex;
 
-    [HideInInspector] public List<Color32> ringTexData;
+    RingTexture ringTex;
 
     Camera cam;
 
@@ -66,17 +65,16 @@ public class BodyRings : MonoBehaviour
         public float angle;
     }
 
+    public List<TextureDrawWindow.PixelBlock> blockTest;
+
     private void OnValidate()
     {
-        ringTex = Resources.Load<Texture2D>("Images/RingStrip");
-        if (OpenWindowButton != prev)
+        if (ringTex == null) ringTex = GetComponentsInChildren<RingTexture>()[0];
+
+        if (OpenWindowButton != prev && Application.isPlaying == false)
         {
             prev = OpenWindowButton;
-            TextureDrawWindow.Open(this);
-        }
-        if(ringTexData.Count == 0)
-        {
-            SetRingTextureData(ringTex);          
+            TextureDrawWindow.Open(ringTex, this);
         }
         SetPlaneTexture();
     }
@@ -99,6 +97,7 @@ public class BodyRings : MonoBehaviour
         float scaleLerp = Mathf.InverseLerp(10, 1000, transform.lossyScale.x);
         float startDensity = Mathf.Lerp(100000, 1000000, scaleLerp);
         ringDensity = (int)(startDensity * (ringWidth + ringOffset));
+        ringDensity = 10000000;
 
 
         SetArrayData();
@@ -155,7 +154,7 @@ public class BodyRings : MonoBehaviour
         ringShader.SetInt("parentPlanetID", parentPlanetID);
         ringShader.SetFloat("parentPlanetPitch", CelestialBodyManager.bodies[parentPlanetID].transform.eulerAngles.x);
         ringShader.SetInt("planetCount", planetCount);
-        ringShader.SetTexture(0, "ringStripTexture", GetRingTextureFromData());
+        ringShader.SetTexture(0, "ringStripTexture", ringTex.GetRingTextureFromData());
     }
 
     void SetBuffers()
@@ -203,48 +202,12 @@ public class BodyRings : MonoBehaviour
         }
     }
 
-    public void SetRingTextureData(Texture2D texture)
-    {
-        ringTexData.Clear();
-        List<Color32> temp = new List<Color32>();
-        for(int i = 0; i < texture.width; i++)
-        {
-            temp.Add(texture.GetPixel(i, 1));
-        }
-        SetRingTextureData(temp);
-    }
-    public void SetRingTextureData(List<Color32> data)
-    {
-        ringTexData = data;
-        SetPlaneTexture();       
-    }
-    public void ResetRingTextureData()
-    {
-        SetRingTextureData(ringTex);
-    }
-
-    public Texture2D GetRingTextureFromData()
-    {
-        Texture2D texture = new Texture2D(1000, 1);
-        for(int i = 0; i < ringTexData.Count; i++)
-        {
-            texture.SetPixel(i, 1, ringTexData[i]);
-        }
-        texture.Apply();
-        return texture;
-    }
-
-    public List<Color32> GetRingTextureData()
-    {
-        return ringTexData;
-    }
-
-    void SetPlaneTexture()
+    public void SetPlaneTexture()
     {
         if (transform.gameObject.activeSelf == true)
         {
             planeRingTex = GetComponentInChildren<DrawPlaneTexture>();
-            planeRingTex.SetTexture(GetRingTextureFromData());
+            planeRingTex.SetTexture(ringTex.GetRingTextureFromData());
         }
     }
 

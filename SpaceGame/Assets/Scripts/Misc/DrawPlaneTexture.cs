@@ -34,7 +34,6 @@ public class DrawPlaneTexture : MonoBehaviour
             ringStripRT.enableRandomWrite = true;
             ringStripRT.Create();
         }
-
         Graphics.Blit(ringTex, ringStripRT);
 
         shader.SetTexture(0, "Result", ringRender);
@@ -46,6 +45,6 @@ public class DrawPlaneTexture : MonoBehaviour
 
         if(resolution.x > 80 && resolution.y > 80) shader.Dispatch(0, resolution.x / 8, resolution.y / 8, 1);
 
-        plane.GetComponentInChildren<Renderer>().sharedMaterial.mainTexture = ringRender;
+        plane.GetComponentInChildren<Renderer>().material.mainTexture = ringRender;
     }
 }
