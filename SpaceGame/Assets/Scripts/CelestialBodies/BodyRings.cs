@@ -9,6 +9,7 @@ public class BodyRings : MonoBehaviour
 {
     [RangeEx(0.25f, 4f, 0.25f), SerializeField] public float ringWidth = 1f;
     [RangeEx(0f, 2f, 0.25f), SerializeField] public float ringOffset = 0.25f;
+    [Range(-180, 180), SerializeField] private int tilt = 0;
 
     int ringDensity;
 
@@ -76,6 +77,7 @@ public class BodyRings : MonoBehaviour
             prev = OpenWindowButton;
             TextureDrawWindow.Open(ringTex, this);
         }
+        transform.eulerAngles = new Vector3(tilt, 0, 0);
         SetPlaneTexture();
     }
 

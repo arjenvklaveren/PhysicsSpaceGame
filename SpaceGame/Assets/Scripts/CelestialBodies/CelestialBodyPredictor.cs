@@ -13,6 +13,8 @@ public class CelestialBodyPredictor : MonoBehaviour
 
     List<VirtualBody> bodyClones = new List<VirtualBody>();
 
+    CelestialBodyManager manager;
+
     private void Update()
     { 
         if(CelestialBodyManager.bodies.Count > 0) SimulatePath();      
@@ -30,9 +32,9 @@ public class CelestialBodyPredictor : MonoBehaviour
         {
             VirtualBody bodyClone = new VirtualBody(CelestialBodyManager.bodies[i]);
             bodyClones.Add(bodyClone);
-            paths.Add(CelestialBodyManager.bodies[i].GetComponent<LineRenderer>());
-            paths[i].startColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
-            paths[i].endColor = CelestialBodyManager.bodies[i].GetComponent<MeshRenderer>().sharedMaterial.color;
+            paths.Add(CelestialBodyManager.bodies[i].GetComponentInChildren<LineRenderer>());
+            paths[i].startColor = CelestialBodyManager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
+            paths[i].endColor = CelestialBodyManager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
             pointArrayList.Add(new List<Vector3>());
 
             if (relativeToBody != null && bodyClone.position == relativeToBody.transform.position) relativeIndex = i; 
