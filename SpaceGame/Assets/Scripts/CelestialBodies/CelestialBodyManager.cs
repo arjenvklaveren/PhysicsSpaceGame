@@ -6,17 +6,11 @@ using TMPro;
 
 public class CelestialBodyManager : MonoBehaviour
 {
-    public static List<CelestialBody> bodies = new List<CelestialBody>();
-    public List<CelestialBody> bodiesClone = new List<CelestialBody>();
+    public List<CelestialBody> bodies = new List<CelestialBody>();
 
-    private void OnValidate()
+    public void AddBody(CelestialBody body)
     {
-        bodies = bodiesClone;
-    }
-
-    private void Awake()
-    {
-        bodies = bodiesClone;
+        bodies.Add(body);
     }
 
     void FixedUpdate()

@@ -16,8 +16,9 @@ public class CelestialBodyPredictor : MonoBehaviour
     CelestialBodyManager manager;
 
     private void Update()
-    { 
-        if(CelestialBodyManager.bodies.Count > 0) SimulatePath();      
+    {
+        if (manager == null) manager = GetComponent<CelestialBodyManager>();
+        if(manager.bodies.Count > 0) SimulatePath();      
     }
 
     void SimulatePath()
@@ -28,13 +29,13 @@ public class CelestialBodyPredictor : MonoBehaviour
 
         int relativeIndex = 0;
       
-        for (int i = 0; i < CelestialBodyManager.bodies.Count; i++)
+        for (int i = 0; i < manager.bodies.Count; i++)
         {
-            VirtualBody bodyClone = new VirtualBody(CelestialBodyManager.bodies[i]);
+            VirtualBody bodyClone = new VirtualBody(manager.bodies[i]);
             bodyClones.Add(bodyClone);
-            paths.Add(CelestialBodyManager.bodies[i].GetComponentInChildren<LineRenderer>());
-            paths[i].startColor = CelestialBodyManager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
-            paths[i].endColor = CelestialBodyManager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
+            paths.Add(manager.bodies[i].GetComponentInChildren<LineRenderer>());
+            paths[i].startColor = manager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
+            paths[i].endColor = manager.bodies[i].GetComponentInChildren<MeshRenderer>().sharedMaterial.color;
             pointArrayList.Add(new List<Vector3>());
 
             if (relativeToBody != null && bodyClone.position == relativeToBody.transform.position) relativeIndex = i; 
@@ -59,9 +60,9 @@ public class CelestialBodyPredictor : MonoBehaviour
                 }
                 else
                 {
-                    paths[j].startColor = Color.red;
-                    paths[j].endColor = Color.red;
-                    break;
+                    //paths[j].startColor = Color.red;
+                    //paths[j].endColor = Color.red;
+                    //break;
                 }
             }
         }
@@ -110,6 +111,7 @@ class VirtualBody
 
     public VirtualBody(CelestialBody CB)
     {
+        if (CB == null) return;
         position = CB.transform.position;
         if(Application.isPlaying)
         {

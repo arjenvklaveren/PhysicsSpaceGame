@@ -6,18 +6,19 @@ using UnityEditor;
 public class SolarSystemObjectView3D : MonoBehaviour
 {
     Rect rect;
-    SolarSystemCreateWindow window;
 
     float borderSize = 2;
 
+    SolarSystemCreateData systemData;
     Camera cam3D;
 
-    public SolarSystemObjectView3D(Rect rect, SolarSystemCreateWindow window)
+    public SolarSystemObjectView3D(Rect rect, SolarSystemCreateData data)
     {
         this.rect = rect;
-        this.window = window;
-        cam3D = window.GetSystemData().Get3DCam();
+        systemData = data;
+        cam3D = data.Get3DCam();
     }
+
     public void Draw()
     {
         EditorGUI.DrawRect(rect, Color.grey);

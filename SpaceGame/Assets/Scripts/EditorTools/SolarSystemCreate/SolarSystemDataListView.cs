@@ -7,12 +7,11 @@ public class SolarSystemDataListView
 {
     Rect rect;
     float borderSize = 2;
-    SolarSystemCreateWindow window;
+    SolarSystemCreateData systemData;
 
-    public SolarSystemDataListView(Rect rect, SolarSystemCreateWindow window)
+    public SolarSystemDataListView(Rect rect, SolarSystemCreateData data)
     {
         this.rect = rect;
-        this.window = window;
     }
     public void Draw()
     {

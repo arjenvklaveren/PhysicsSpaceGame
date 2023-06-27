@@ -25,23 +25,22 @@ public class SolarSystemCreateWindow : EditorWindow
 
         systemObject = Instantiate(Resources.Load<GameObject>("Prefabs/NewSystem"));
         systemData.OnStart(systemObject);
-        solar2Dview = new SolarSystemView2D(new Rect(5, 5, 600, 600), window);
-        object3Dview = new SolarSystemObjectView3D(new Rect(430, 5, 175, 175), window);
-        dataListview = new SolarSystemDataListView(new Rect(610, 5, 285, 550), window);
-
-        
-    }
-
-    public SolarSystemCreateData GetSystemData()
-    {
-        return systemData;
+        solar2Dview = new SolarSystemView2D(new Rect(5, 5, 600, 600), systemData);
+        object3Dview = new SolarSystemObjectView3D(new Rect(430, 5, 175, 175), systemData);
+        dataListview = new SolarSystemDataListView(new Rect(610, 5, 285, 550), systemData);   
     }
 
     void OnGUI()
     {
+        if (window == null)
+        {
+            DestroyImmediate(systemObject);
+            this.Close();
+            return;
+        }
+        dataListview.Draw();
         solar2Dview.Draw();
         object3Dview.Draw();
-        dataListview.Draw();
         if (GUI.Button(new Rect(615, 565, 135, 30), new GUIContent("Cancel")))
         {
             window.Close();
@@ -51,6 +50,7 @@ public class SolarSystemCreateWindow : EditorWindow
             isCreate = true;
             window.Close();
         }
+        window.Repaint();
     }
 
     private void OnDestroy()
