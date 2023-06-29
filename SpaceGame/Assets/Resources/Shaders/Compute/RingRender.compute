@@ -21,7 +21,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float2 pos = float2(id.x, id.y);
     float distFromCentre = length(pos - centre);
     float ringScale = 0.1 + (0.1 * (ringWidth + ringOffset));
-    float ringRadiusScale = planetRadius * (0.2 / ringScale);
+    float ringRadiusScale = 500 * (0.2 / ringScale);
     float offsetDistance = ringRadiusScale + (ringRadiusScale * ringOffset);
         
     float invLerpCoord = invLerp(offsetDistance, 1000, distFromCentre);

@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 [ExecuteInEditMode]
 public class CelestialBodyPredictor : MonoBehaviour
 {
+    bool predict = true;
     [SerializeField, Range(5000, 100000)] private int timeSteps;
     [SerializeField, Range(1,250)] private int lineDetail;
 
@@ -17,8 +18,8 @@ public class CelestialBodyPredictor : MonoBehaviour
 
     private void Update()
     {
-        if (manager == null) manager = GetComponent<CelestialBodyManager>();
-        if(manager.bodies.Count > 0) SimulatePath();      
+        if (manager == null) manager = GetComponentInParent<CelestialBodyManager>();
+        if(manager.bodies.Count > 0 && predict) SimulatePath();      
     }
 
     void SimulatePath()
@@ -100,6 +101,15 @@ public class CelestialBodyPredictor : MonoBehaviour
         }
         return forceVector;
     }
+
+    public bool GetActive() { return predict; }
+    public void SetActive(bool status)
+    {
+        if (manager == null || status == predict) return;
+        predict = status;
+        foreach(CelestialBody body in manager.bodies) { body.GetComponentInChildren<LineRenderer>().enabled = status; }
+    }
+    public void SetRelativeBody(CelestialBody body) { relativeToBody = body; }
 }
 
 class VirtualBody
@@ -113,14 +123,8 @@ class VirtualBody
     {
         if (CB == null) return;
         position = CB.transform.position;
-        if(Application.isPlaying)
-        {
-            velocity = CB.velocity;
-        }
-        else
-        {
-            velocity = CB.initialVelocity;
-        }
+        if(Application.isPlaying)  velocity = CB.GetVelocity(); 
+        else velocity = CB.GetInitialVelocity(); 
         mass = CB.mass;
         radius = CB.transform.lossyScale.x / 2;
     }

@@ -50,8 +50,8 @@ public class EditorValueCurve
         SetValuesBasedOnAnchors();
     }
 
-    TextureDrawWindow window;
-    public void Draw(TextureDrawWindow window)
+    RingTextureDrawWindow window;
+    public void Draw(RingTextureDrawWindow window)
     {
         this.window = window;
 
@@ -254,34 +254,4 @@ class CurveLine
         Handles.EndGUI();  
     }
 }
-
-class TestCurveRider
-{
-    EditorValueCurve curve;
-    float speed;
-    Rect parentRect;
-
-    float xPos;
-
-    public TestCurveRider(EditorValueCurve curve, float speed)
-    {
-        this.curve = curve;
-        this.speed = speed;
-        parentRect = curve.rect;
-    }
-
-    public void SetXPos(float xPos) { this.xPos = xPos; }
-
-    public void RideCurve()
-    {
-        xPos += speed;
-        float yPos = 255 - curve.GetValueAtPoint(xPos);
-
-        Vector2 relativePos = new Vector2(xPos + parentRect.x, (yPos / 255 * 100) + parentRect.y);
-        EditorGUI.DrawRect(new Rect(relativePos.x - 2, relativePos.y - 2, 5, 5), Color.green);
-
-        if (xPos > 1000) xPos = 0;
-    }
-}
-
 

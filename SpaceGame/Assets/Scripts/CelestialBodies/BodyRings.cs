@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-[RequireComponent(typeof(CelestialBody))]
-
 public class BodyRings : MonoBehaviour
 {
     [RangeEx(0.25f, 4f, 0.25f), SerializeField] public float ringWidth = 1f;
@@ -47,6 +45,7 @@ public class BodyRings : MonoBehaviour
     private bool prev;
 
     CelestialBodyManager manager;
+    CelestialBody body;
 
     struct Particle
     {
@@ -68,25 +67,25 @@ public class BodyRings : MonoBehaviour
         public float angle;
     }
 
-    public List<TextureDrawWindow.PixelBlock> blockTest;
-
     private void OnValidate()
     {
         if (ringTex == null) ringTex = GetComponentsInChildren<RingTexture>()[0];
+        if (ringTex.GetRawTex() == null) ringTex.ResetTex();
 
-        if (OpenWindowButton != prev && Application.isPlaying == false)
+        if (OpenWindowButton != prev && !Application.isPlaying && ringTex)
         {
             prev = OpenWindowButton;
-            TextureDrawWindow.Open(ringTex, this);
+            RingTextureDrawWindow.Open(ringTex, this);
         }
         transform.eulerAngles = new Vector3(tilt, 0, 0);
-        SetPlaneTexture();
+        if(ringTex) SetPlaneTexture();
     }
 
     void Start()
     {
         ringShader = (ComputeShader)Instantiate(Resources.Load<ComputeShader>("Shaders/Compute/RingsCompute"));
         manager = GetComponentInParent<CelestialBodyManager>();
+        body = GetComponentInParent<CelestialBody>();
         particleMaterial = Resources.Load<Material>("Materials/Alpha");
         planeRingTex = GetComponentInChildren<DrawPlaneTexture>();
         planeRingTex.gameObject.SetActive(false);
@@ -95,11 +94,11 @@ public class BodyRings : MonoBehaviour
         cam = Camera.main;
 
         planetCount = manager.bodies.Count;
-        parentPlanetID = manager.bodies.IndexOf(GetComponent<CelestialBody>());
+        parentPlanetID = manager.bodies.IndexOf(body);
         planets = new Planet[planetCount];
 
 
-        float scaleLerp = Mathf.InverseLerp(10, 1000, transform.lossyScale.x);
+        float scaleLerp = Mathf.InverseLerp(10, 1000, body.transform.lossyScale.x);
         float startDensity = Mathf.Lerp(100000, 1000000, scaleLerp);
         ringDensity = (int)(startDensity * (ringWidth + ringOffset));
         ringDensity = 10000000;
@@ -149,7 +148,7 @@ public class BodyRings : MonoBehaviour
         float rand = Random.Range(0, 1000000) * System.DateTime.Now.Millisecond / 100000;
         ringShader.SetBool("firstLoop", true);
         ringShader.SetFloat("particleCount", ringDensity);
-        ringShader.SetFloat("ringWidth", transform.lossyScale.x * (1 / Universe.scaleMultiplier) * ringWidth);
+        ringShader.SetFloat("ringWidth", body.transform.lossyScale.x * (1 / Universe.scaleMultiplier) * ringWidth);
         ringShader.SetFloat("timeStep", Universe.timeStep);
         ringShader.SetFloat("randOffset", rand);
         ringShader.SetFloat("gravConstant", Universe.G);
@@ -212,7 +211,7 @@ public class BodyRings : MonoBehaviour
         if (transform.gameObject.activeSelf == true)
         {
             planeRingTex = GetComponentInChildren<DrawPlaneTexture>();
-            planeRingTex.SetTexture(ringTex.GetRingTextureFromData());
+            planeRingTex.SetTexture(ringTex.GetRingTextureFromData(), this);
         }
     }
 

@@ -5,10 +5,13 @@ using UnityEngine;
 public class CelestialBody : MonoBehaviour
 {
     [RangeEx(100, 50000, 100)] public int mass = 10000;
-    [RangeEx(1, 100), SerializeField] private int scaleMass = 100;
-    public Vector3 initialVelocity;
+    [RangeEx(1, 100), SerializeField] public int scaleMass = 100;
 
-    [HideInInspector] public Vector3 velocity;
+    [SerializeField] private Vector3 initialVelocity;
+    private Vector3 velocity;
+
+    public enum BodyTypes { Planet, Moon, Ring, Sun }
+    BodyTypes type = BodyTypes.Planet;
 
     void Start()
     {
@@ -17,20 +20,31 @@ public class CelestialBody : MonoBehaviour
 
     private void OnValidate()
     {
-        float scaleTemp = 0.01f * scaleMass;
-        float scale = mass * Universe.scaleMultiplier * scaleTemp;
-        if (scale > Universe.maxScale) scale = Universe.maxScale;
-        if (scale < Universe.minScale) scale = Universe.minScale;
-        transform.localScale = new Vector3(scale, scale, scale);
+        SetSize();
     }
 
     public void AddForce(Vector3 force)
     {        
         velocity += force;
     }
-
     public void UpdatePosition()
     {      
         transform.position += velocity * Universe.timeStep;
+    }
+    public Vector3 GetVelocity()
+    {
+        return velocity;
+    }
+    public Vector3 GetInitialVelocity()
+    {
+        return initialVelocity;
+    }
+    public void SetSize()
+    {
+        float scaleTemp = 0.01f * scaleMass;
+        float scale = mass * Universe.scaleMultiplier * scaleTemp;
+        if (scale > Universe.maxScale) scale = Universe.maxScale;
+        if (scale < Universe.minScale) scale = Universe.minScale;
+        transform.localScale = new Vector3(scale, scale, scale);
     }
 }

@@ -14,11 +14,10 @@ public class DrawPlaneTexture : MonoBehaviour
 
     ComputeShader shader;
 
-    public void SetTexture(Texture2D ringTex)
+    public void SetTexture(Texture2D ringTex, BodyRings ring)
     {
         shader = (ComputeShader)Instantiate(Resources.Load<ComputeShader>("Shaders/Compute/RingRender"));
         plane = this.gameObject;
-        ring = transform.GetComponentInParent<BodyRings>();
         float ringScale = 0.1f + (0.1f * (ring.ringWidth + ring.ringOffset));
         plane.transform.localScale = new Vector3(ringScale, ringScale, ringScale);
 
@@ -45,6 +44,9 @@ public class DrawPlaneTexture : MonoBehaviour
 
         if(resolution.x > 80 && resolution.y > 80) shader.Dispatch(0, resolution.x / 8, resolution.y / 8, 1);
 
-        plane.GetComponentInChildren<Renderer>().material.mainTexture = ringRender;
+        Renderer planeRenderer = plane.GetComponentInChildren<Renderer>();
+        Material tempMaterial = new Material(Shader.Find("UI/Unlit/Transparent"));
+        tempMaterial.mainTexture = ringRender;
+        planeRenderer.sharedMaterial = tempMaterial;
     }
 }

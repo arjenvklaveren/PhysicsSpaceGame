@@ -8,23 +8,17 @@ public class CelestialBodyManager : MonoBehaviour
 {
     public List<CelestialBody> bodies = new List<CelestialBody>();
 
+    void FixedUpdate()
+    {      
+        MoveBodiesNewton(); 
+    }
+
     public void AddBody(CelestialBody body)
     {
         bodies.Add(body);
     }
 
-    void FixedUpdate()
-    {      
-        AddNewton();
-        DetectCollision();     
-    }
-
-    void DetectCollision()
-    {
-
-    }
-
-    void AddNewton()
+    void MoveBodiesNewton()
     {
         for (int i = 0; i < bodies.Count; i++)
         {

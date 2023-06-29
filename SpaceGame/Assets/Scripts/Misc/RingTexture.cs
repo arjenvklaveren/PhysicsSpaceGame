@@ -47,6 +47,21 @@ public class RingTexture : MonoBehaviour
         return texData.Count;
     }
 
+    public void ResetTex()
+    {
+        Texture2D resetTex = new Texture2D(1000, 1);
+        rawTex = resetTex;
+        resetTex.SetPixels(Resources.Load<Texture2D>("Images/ResetRingTex").GetPixels());
+        for (int i = 0; i < 1000; i++)
+        {
+            Color newColor = resetTex.GetPixel(i, 1);
+            texData[i] = newColor;
+            newColor.a = 1;
+            rawTex.SetPixel(i, 1, newColor);
+        }
+        rawTex.Apply();
+    }
+
     public void SetRawTex(Texture2D rawTex)
     {
         this.rawTex = rawTex;
