@@ -222,6 +222,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   p1: {fileID: 1423237833}
   p2: {fileID: 1699937091}
+  rot: 0
 --- !u!1 &949277164
 GameObject:
   m_ObjectHideFlags: 0

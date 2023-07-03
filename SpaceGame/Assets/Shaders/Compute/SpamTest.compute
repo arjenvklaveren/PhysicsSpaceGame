@@ -1,9 +1,0 @@
-#pragma kernel Spam
-
-RWStructuredBuffer<int> test;
-
-[numthreads(256, 1, 1)]
-void Spam (uint3 id : SV_DispatchThreadID)
-{
-    test[id.x] = id.x;
-}
